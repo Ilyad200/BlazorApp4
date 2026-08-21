@@ -1,0 +1,127 @@
+﻿@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="split-container">
+    <div id="@_leftId" class="split-pane @(RightVisible ? "" : "split-single")">
+        @Left
+    </div>
+
+    @if (RightVisible)
+    {
+        <div id="@_rightId" class="split-pane">
+            @Right
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? Left { get; set; }
+
+    [Parameter]
+    public RenderFragment? Right { get; set; }
+
+    [Parameter]
+    public bool RightVisible { get; set; }
+
+    [Parameter]
+    public double[] Sizes { get; set; } = [70, 30];
+
+    [Parameter]
+    public EventCallback<double[]> SizesChanged { get; set; }
+
+    [Parameter]
+    public int GutterSize { get; set; } = 8;
+
+    [Parameter]
+    public int MinLeftSize { get; set; } = 200;
+
+    [Parameter]
+    public int MinRightSize { get; set; } = 200;
+
+    private readonly string _id = Guid.NewGuid().ToString();
+
+    private string _leftId = "";
+    private string _rightId = "";
+
+    private bool _splitterCreated;
+    private bool _previousRightVisible = false;
+
+    private DotNetObjectReference<SplitView>? _objRef;
+
+    protected override void OnInitialized()
+    {
+        _leftId = $"left-{_id}";
+        _rightId = $"right-{_id}";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+        }
+
+        if (_previousRightVisible != RightVisible)
+        {
+            if (RightVisible)
+            {
+                await CreateSplitter();
+            }
+            else
+            {
+                await DestroySplitter();
+            }
+
+            _previousRightVisible = RightVisible;
+        }
+    }
+
+    private async Task CreateSplitter()
+    {
+        if (_splitterCreated)
+            return;
+
+        await JS.InvokeVoidAsync(
+            "splitter.create",
+            _id,
+            $"#{_leftId}",
+            $"#{_rightId}",
+            new
+            {
+                sizes = Sizes,
+                minSize = new[] { MinLeftSize, MinRightSize },
+                gutterSize = GutterSize,
+                onChanged = _objRef
+            });
+
+        _splitterCreated = true;
+    }
+
+    private async Task DestroySplitter()
+    {
+        if (!_splitterCreated)
+            return;
+
+        await JS.InvokeVoidAsync("splitter.destroy", _id);
+
+        _splitterCreated = false;
+    }
+
+    [JSInvokable]
+    public async Task OnSizesChanged(double[] sizes)
+    {
+        Sizes = sizes;
+        await SizesChanged.InvokeAsync(sizes);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_splitterCreated)
+        {
+            await JS.InvokeVoidAsync("splitter.destroy", _id);
+        }
+
+        _objRef?.Dispose();
+    }
+}

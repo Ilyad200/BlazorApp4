@@ -1,0 +1,286 @@
+/*
+ * app-components.css
+ * ---------------------------------------------------------------
+ * Точечный патч поверх app.css.
+ *
+ * Компоненты (ChatSidebar, ChatView, PinnedMessageView, ModelSelector,
+ * AIComponent, MainLayout) переписаны так, чтобы использовать классы
+ * из app.css напрямую (.rail/.reel, .stream/.msg/.bubble, .console,
+ * .specimens, .model-selector...) — они уже спроектированы под эту
+ * же функциональность (сравнение чатов, similarity, staleness, pin).
+ *
+ * Этот файл добавляет только то, чего в app.css не было:
+ *   1) интеграция с layout MainLayout (.page — обычный flex,
+ *      а не .app-grid из исходного макета);
+ *   2) типографика для Home/Error/NotFound;
+ *   3) .rail в контексте flex вместо CSS grid;
+ *   4) resizer для сайдбара;
+ *   5) .compare-toolbar (панель сравнения внутри ChatView);
+ *   6) модалка "добавить модель" (.modal-backdrop-custom/.modal-card/.modal-actions)
+ *      и .model-selector-backdrop — их не было в исходном app.css;
+ *   7) .ai-root — обёртка корневой страницы под SplitView;
+ *   8) тёмная тема для оставшихся bootstrap-компонентов
+ *      (form-control, alert, text-danger) — используются точечно
+ *      (например, в модалке добавления модели).
+ *
+ * Подключать после bootstrap.min.css и после app.css:
+ *   <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+ *   <link href="app.css" rel="stylesheet" />
+ *   <link href="app-components.css" rel="stylesheet" />
+ * ---------------------------------------------------------------
+ */
+
+html, body, #app {
+    height: 100%;
+}
+
+/* ============ PAGE SHELL (MainLayout) ============ */
+.page {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background: var(--ink);
+    color: var(--text);
+}
+
+.page main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--ink);
+}
+
+.page main article {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.ai-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#blazor-error-ui {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: var(--surface-2);
+    color: var(--text);
+    border-top: 1px solid var(--led-bad);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    padding: 10px 44px 10px 16px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .35);
+}
+
+    #blazor-error-ui .reload {
+        color: var(--trace-a);
+        margin-left: 8px;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    #blazor-error-ui .dismiss {
+        position: absolute;
+        top: 8px;
+        right: 14px;
+        color: var(--text-faint);
+        cursor: pointer;
+    }
+
+        #blazor-error-ui .dismiss:hover {
+            color: var(--text);
+        }
+
+/* ============ GENERIC PAGE TYPOGRAPHY (Home / Error / NotFound) ============ */
+.page main article h1,
+.page main article h2,
+.page main article h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 0;
+}
+
+.page main article {
+    padding: 24px;
+    overflow: auto;
+}
+
+.page main article h1 { font-size: 22px; margin-bottom: 10px; }
+
+.page main article h2 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+}
+
+.page main article h2.text-danger,
+.page main article h1.text-danger {
+    color: var(--led-bad) !important;
+}
+
+.page main article h3 { font-size: 15px; margin-top: 20px; }
+
+.page main article p {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    max-width: 640px;
+}
+
+.page main article code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--trace-a);
+}
+
+.page main article strong { color: var(--text); }
+.page main article a { color: var(--trace-a); }
+
+/* AIComponent's <article> hosts the split chat UI, not prose — give it back full height/no scroll/no padding */
+.page main article:has(.ai-root) {
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ============ RAIL IN A FLEX (not CSS-grid) SHELL ============ */
+.rail {
+    flex: none;
+    width: 260px;
+    min-width: 200px;
+    max-width: 420px;
+    position: relative;
+    height: 100%;
+}
+
+.resizer {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 5;
+    background: transparent;
+    transition: background .12s;
+}
+
+    .resizer:hover {
+        background: var(--hair);
+    }
+
+@media (max-width: 880px) {
+    .rail {
+        width: 220px;
+    }
+}
+
+/* ============ COMPARE TOOLBAR (inside each ChatView stream) ============ */
+.compare-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--hair);
+    background: var(--surface);
+    flex-wrap: wrap;
+    margin: -20px -20px 14px;
+}
+
+/* ============ "ADD MODEL" MODAL (not present in app.css) ============ */
+.model-selector-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 15;
+}
+
+.modal-backdrop-custom {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 11, 14, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.modal-card {
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius);
+    padding: 20px;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 20px 44px rgba(0, 0, 0, .45);
+}
+
+    .modal-card h5 {
+        margin: 0 0 12px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text);
+    }
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+/* ============ REMAINING BOOTSTRAP BITS (used sparingly, e.g. inside the modal) ============ */
+.form-control,
+textarea.form-control,
+input.form-control {
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    padding: 10px 12px;
+}
+
+    .form-control:focus {
+        background: var(--surface-2);
+        border-color: var(--trace-a);
+        color: var(--text);
+        box-shadow: none;
+    }
+
+    .form-control::placeholder {
+        color: var(--text-faint);
+    }
+
+.alert {
+    border-radius: var(--radius);
+    font-size: 12.5px;
+    padding: 10px 14px;
+    border: 1px solid transparent;
+    margin: 0 20px 12px;
+}
+
+.alert-danger {
+    background: rgba(193, 89, 79, .12);
+    border-color: var(--led-bad);
+    color: var(--led-bad);
+}
+
+.text-muted { color: var(--text-faint) !important; }
+.text-danger { color: var(--led-bad) !important; }

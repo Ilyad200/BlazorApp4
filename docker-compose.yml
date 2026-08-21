@@ -1,0 +1,35 @@
+name: blazorapp4
+
+services:
+  blazorapp4:
+    container_name: blazorapp4
+    image: ${DOCKER_REGISTRY-}blazorapp4
+    build:
+      context: .
+      dockerfile: BlazorApp4/BlazorApp4/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - OpenRouter__ApiKey=${OPENROUTER_APIKEY}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8080:8081"   # пример, если нужно
+    depends_on:
+      - db
+
+  db:
+    image: postgres:latest
+    container_name: db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    restart: always
+
+volumes:
+  postgres_data:

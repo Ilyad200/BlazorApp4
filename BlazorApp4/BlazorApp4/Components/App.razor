@@ -1,0 +1,27 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    @* <link rel="stylesheet" href="@Assets["app-components.css"]" /> *@
+    <link rel="stylesheet" href="@Assets["BlazorApp4.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @* <script src="https://unpkg.com/split.js/dist/split.min.js"></script> *@
+    <script src="Split.js"></script>
+    <script src="splitter.js"></script>
+    <script src="compareScroll.js"></script>
+</body>
+
+</html>

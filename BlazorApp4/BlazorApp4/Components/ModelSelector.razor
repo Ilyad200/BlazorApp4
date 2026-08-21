@@ -1,0 +1,144 @@
+@using BlazorApp4.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject ModelListService ModelListService
+@implements IDisposable
+
+<div class="model-selector">
+    <div class="model-selector-trigger" @onclick="ToggleDropdown">
+        <span class="model-selector-value" title="@Value">@Value</span>
+        <span class="model-selector-caret">▾</span>
+    </div>
+
+    @if (isOpen)
+    {
+        <div class="model-selector-backdrop" @onclick="CloseDropdown"></div>
+        <div class="model-selector-dropdown">
+            @foreach (var model in ModelListService.Models)
+            {
+                <div class="model-selector-item @(model == Value ? "active" : "")"
+                     title="@model"
+                     @onclick="() => SelectModel(model)">
+                    @model
+                </div>
+            }
+            <div class="model-selector-item model-selector-add" @onclick="OpenAddModal">
+                + Добавить новую модель
+            </div>
+        </div>
+    }
+</div>
+
+@if (showAddModal)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseAddModal">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h5>Добавить модель</h5>
+            <input class="form-control" placeholder="Например: provider/model-name:free"
+                   @bind="newModelUrl" @bind:event="oninput"
+                   @onkeydown="HandleModalKeyDown" autofocus />
+            @if (!string.IsNullOrEmpty(addError))
+            {
+                <div class="text-danger small mt-2">@addError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn btn-outline-secondary" @onclick="CloseAddModal">Отмена</button>
+                <button class="btn btn-primary" @onclick="ConfirmAddModel">Добавить</button>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (showAddModal)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseAddModal">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h5>Добавить модель</h5>
+            <input class="form-control" placeholder="Например: provider/model-name:free"
+                   @bind="newModelUrl" @bind:event="oninput"
+                   @onkeydown="HandleModalKeyDown" autofocus />
+            @if (!string.IsNullOrEmpty(addError))
+            {
+                <div class="text-danger small mt-2">@addError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn btn-outline-secondary" @onclick="CloseAddModal">Отмена</button>
+                <button class="btn btn-primary" @onclick="ConfirmAddModel">Добавить</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private bool isOpen = false;
+    private bool showAddModal = false;
+    private string newModelUrl = "";
+    private string addError = "";
+
+    protected override void OnInitialized()
+    {
+        // Если кто-то добавил модель через компонент в другой панели (например,
+        // сравнение), этот компонент тоже должен увидеть новую модель в списке.
+        ModelListService.OnChange += StateHasChanged;
+    }
+
+    private void ToggleDropdown() => isOpen = !isOpen;
+    private void CloseDropdown() => isOpen = false;
+
+    private async Task SelectModel(string model)
+    {
+        isOpen = false;
+        if (model != Value)
+        {
+            await ValueChanged.InvokeAsync(model);
+        }
+    }
+
+    private void OpenAddModal()
+    {
+        isOpen = false;
+        newModelUrl = "";
+        addError = "";
+        showAddModal = true;
+    }
+
+    private void CloseAddModal()
+    {
+        showAddModal = false;
+    }
+
+    private async Task ConfirmAddModel()
+    {
+        var url = newModelUrl.Trim();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            addError = "Введите ссылку или идентификатор модели.";
+            return;
+        }
+
+        ModelListService.AddModel(url);
+        showAddModal = false;
+        // Сразу выбираем только что добавленную модель.
+        await ValueChanged.InvokeAsync(url);
+    }
+
+    private async Task HandleModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConfirmAddModel();
+        }
+        else if (e.Key == "Escape")
+        {
+            CloseAddModal();
+        }
+    }
+
+    public void Dispose()
+    {
+        ModelListService.OnChange -= StateHasChanged;
+    }
+}

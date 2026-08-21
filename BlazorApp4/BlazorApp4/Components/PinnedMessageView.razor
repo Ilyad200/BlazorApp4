@@ -1,0 +1,49 @@
+﻿@using BlazorApp4.Services;
+@using BlazorApp4.Models;
+@using OpenRouter.NET.Models;
+
+@inject ChatService ChatService
+@inject AiService AiService
+@inject PinService PinService
+
+@inject PinService PinService
+
+<div class="pinned-panel">
+	@foreach (var mes in PinService.PinnedMessageList.OrderBy(m => m.Order))
+	{
+        <div class="msg @mes.Role">
+            <div class="msg-tag">
+                <span class="model-name">@(mes.Role == "assistant" ? mes.Model : "User")</span>
+            </div>
+			<div class="bubble">
+                @mes.Version.Content
+            </div>
+			<div class="msg-foot">
+				<button class="ms-auto btn btn-outline-info"
+						@onclick="() => ChatService.SwitchChat(mes.MessageDb.ChatId)">
+						└
+				</button>
+				<button class="ms-auto btn btn-outline-info"
+					@onclick="() => ChatService.SetCompareWith(mes.MessageDb.ChatId)">
+					┘
+				</button>
+                <button class="ms-auto btn btn-outline-danger"
+                        @onclick="() => PinService.RemoveMessage(mes.Id)">🚫
+                </button>
+            </div>
+        </div>
+	}
+</div>
+@code {
+
+	protected override void OnInitialized()
+	{
+		ChatService.OnChange += StateHasChanged;
+		PinService.OnChange += StateHasChanged;
+	}
+	public void Dispose()
+	{
+		ChatService.OnChange -= StateHasChanged;
+		PinService.OnChange -= StateHasChanged;
+	}
+}

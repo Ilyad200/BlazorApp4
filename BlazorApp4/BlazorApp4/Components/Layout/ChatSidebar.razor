@@ -1,0 +1,94 @@
+﻿@rendermode InteractiveServer
+@using BlazorApp4.Services;
+@using BlazorApp4.Models;
+@inject ChatService ChatService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div @ref="sidebarContainer" class="rail">
+    @* <nav class="bg-light p-3"> *@
+    <div class="rail-head">
+        <button class="new-chat-btn" @onclick="CreateNewChat"><span class="plus">+</span> Новый чат</button>
+    </div>
+        @* <button class="btn btn-primary w-100 mb-3" @onclick="CreateNewChat">+ Новый чат</button> *@
+    <ul class="rail-list">
+        <div class="rail-section-label">Чаты</div>
+
+        @foreach (var chat in ChatService.DbChats)
+        {
+            <li class="reel @(IsActive(chat) ? "active" : "")"
+                    @onclick="() => ChatService.SwitchChat(chat.Id)"
+                    @onmouseover="() => hoveredChatId = chat.Id"
+                    @onmouseout="() => hoveredChatId = null"
+                    role="button">
+                <div class="reel-body">
+                    <div class="reel-info">
+                        <span class="reel-name">@chat.Name</span>
+                        <div class="reel-meta">@chat.Messages.Count сообщ.</div>
+                    </div>
+                    @if (hoveredChatId == chat.Id && ChatService.CurrentChatDb != null)
+                    {
+                        <button class="reel-compare-btn"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => ToggleCompare(chat.Id)"
+                                title="Добавить к сравнению">
+                            ⇆
+                        </button>
+                    }
+
+                    @if (ChatService.CompareWithChatId == chat.Id)
+                    {
+                        <span class="reel-compare-badge" title="Выбран для сравнения">✓</span>
+                    }
+                </div>
+
+            </li>
+        }
+        </ul>
+    @* </nav> *@
+</div>
+
+@code {
+    private int? hoveredChatId;
+
+    private ElementReference sidebarContainer;
+    private ElementReference resizer;
+
+    protected override void OnInitialized()
+    {
+        ChatService.OnChange += StateHasChanged;
+        //ChatService.OnComparisonChanged += OnCompareChanged;
+    }
+
+    private bool IsActive(ChatDb chat) =>
+        ChatService.CurrentChatDbId == chat.Id;
+
+    private async Task CreateNewChat() 
+    {
+
+        await JS.InvokeVoidAsync(
+                            "compareScroll.enable",
+                            false);
+        await ChatService.AddChatAsync();
+    }
+
+    private async Task ToggleCompare(int chatId)
+    {
+        Console.WriteLine($"ToggleCompare called for chat {chatId}, Current CompareWith: {ChatService.CompareWithChatId}");
+        if (ChatService.CompareWithChatId == chatId)
+            await ChatService.SetCompareWith(null);
+        else
+            await ChatService.SetCompareWith(chatId);
+    }
+
+    private void OnCompareChanged(bool isCompare)
+    {
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        ChatService.OnChange -= StateHasChanged;
+        //ChatService.OnComparisonChanged -= OnCompareChanged;
+    }
+}
