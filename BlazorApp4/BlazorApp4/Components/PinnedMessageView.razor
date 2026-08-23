@@ -1,4 +1,5 @@
-﻿@using BlazorApp4.Services;
+﻿@rendermode InteractiveServer
+@using BlazorApp4.Services;
 @using BlazorApp4.Models;
 @using OpenRouter.NET.Models;
 
@@ -19,14 +20,16 @@
                 @mes.Version.Content
             </div>
 			<div class="msg-foot">
-				<button class="ms-auto btn btn-outline-info"
-						@onclick="() => ChatService.SwitchChat(mes.MessageDb.ChatId)">
+				<div>
+					<button class="ms-auto btn btn-outline-info"
+							@onclick="async () => await ChatService.SwitchChat(mes.MessageDb.ChatId)">
 						└
-				</button>
-				<button class="ms-auto btn btn-outline-info"
-					@onclick="() => ChatService.SetCompareWith(mes.MessageDb.ChatId)">
-					┘
-				</button>
+					</button>
+					<button class="ms-auto btn btn-outline-info"
+							@onclick="async () => await ChatService.SetCompareWith(mes.MessageDb.ChatId)">
+						┘
+					</button>
+				</div>
                 <button class="ms-auto btn btn-outline-danger"
                         @onclick="() => PinService.RemoveMessage(mes.Id)">🚫
                 </button>

@@ -41,5 +41,25 @@
             if (other.Snapshot != null) Snapshot = other.Snapshot;
             else Snapshot = null;
         }
+        public static VersionDb CreateCleanVersion(VersionDb other)
+        {
+            var newVers = new VersionDb
+            {
+                Content = other.Content,
+                Order = other.Order,
+                Model = other.Model,
+                IsOriginal = other.IsOriginal,
+                CreatedAt = other.CreatedAt
+            };
+            if (other.PreviousVersions != null)
+            {
+                newVers.PreviousVersions = new List<VersionDb>(other.PreviousVersions.Count);
+                foreach (var v in other.PreviousVersions)
+                {
+                    newVers.PreviousVersions.Add(CreateCleanVersion(v));
+                }
+            }
+            return newVers;
+        }
     }
 }

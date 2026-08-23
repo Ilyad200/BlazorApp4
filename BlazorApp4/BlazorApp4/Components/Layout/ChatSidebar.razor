@@ -57,7 +57,7 @@
     protected override void OnInitialized()
     {
         ChatService.OnChange += StateHasChanged;
-        //ChatService.OnComparisonChanged += OnCompareChanged;
+        ChatService.OnComparisonChanged += OnCompareChanged;
     }
 
     private bool IsActive(ChatDb chat) =>
@@ -89,6 +89,6 @@
     public void Dispose()
     {
         ChatService.OnChange -= StateHasChanged;
-        //ChatService.OnComparisonChanged -= OnCompareChanged;
+        ChatService.OnComparisonChanged -= OnCompareChanged;
     }
 }

@@ -132,7 +132,6 @@ namespace BlazorApp4.Services
             var chat = new ChatDb(name ?? $"Chat {DbChats.Count + 1}");
             await context.Chats.AddAsync(chat);
             await context.SaveChangesAsync();
-            DbChats.Add(chat);
             Console.WriteLine("///////////////////////////////////////////////////////// " + chat.Id);
 
             await RefreshDbChatsAsync(); 
@@ -169,9 +168,11 @@ namespace BlazorApp4.Services
         public async Task SwitchChat(int chatId)
         {
             CurrentChatDbId = chatId;
-            CurrentChatDb = await GetChatById(chatId);
+            CurrentChatDb = await GetFullChatById(chatId);
             await RebuildContextShiftCacheAsync(chatId);
             NotifyStateChanged();
+
+            Console.WriteLine($"[ChatService SwitchChat] complete");
         }
 
         public List<ChatDb> GetAllChats()
@@ -207,6 +208,18 @@ namespace BlazorApp4.Services
             using var context = _contextFactory.CreateDbContext();
             //var chat = _context.Chats.FirstOrDefault(c => c.Id == id);
             var chat = await context.Chats.Include(c => c.Messages).ThenInclude(m => m.Versions).FirstOrDefaultAsync(c => c.Id == id);
+            return chat ?? throw new Exception("Chat not found");
+        }
+        public async Task<ChatDb> GetFullChatById(int id)
+        {
+            using var context = _contextFactory.CreateDbContext();
+            //var chat = _context.Chats.FirstOrDefault(c => c.Id == id);
+            var chat = await context.Chats
+                                .Include(c => c.Messages)
+                                    .ThenInclude(m => m.Versions)
+                                        .ThenInclude(v => v.Snapshot)
+                                            .ThenInclude(s => s.Entries)
+                            .FirstOrDefaultAsync(c => c.Id == id);
             return chat ?? throw new Exception("Chat not found");
         }
         private async Task RefreshChatSlot(int chatId, bool isCompare = false)
@@ -424,9 +437,9 @@ namespace BlazorApp4.Services
         // Переключиться на предыдущую версию сообщения
         public async Task SwitchToVersionAsync(int chatId, int messageId, int versionId, bool isCompare = false)
         {
+            MessageDb? msg = null;
             if (CompareWithChatId == CurrentChatDbId && CompareWithChatId == chatId)
             {
-                MessageDb? msg = null;
                 if (isCompare)
                 {
                     if (CompareWithChat == null) return;
@@ -437,9 +450,12 @@ namespace BlazorApp4.Services
                     if (CurrentChatDb == null) return;
                     msg = CurrentChatDb.Messages.FirstOrDefault(m => m.Id == messageId);
                 }
+                Console.WriteLine($"[ChatService SwitchToVersionAsync] chat id: {(isCompare ? CompareWithChat.Id : CurrentChatDb.Id)}");
                 if (msg == null) return;
+                Console.WriteLine($"[ChatService SwitchToVersionAsync] msg id: {msg.Id}");
                 var vers = msg.Versions.FirstOrDefault(v => v.Id == versionId);
                 if (vers == null) return;
+                Console.WriteLine($"[ChatService SwitchToVersionAsync] vers id: {vers.Id}");
                 msg.CurrentVersionOrder = vers.Order;
 
                 await UpdateContextShiftAfterEditAsync(chatId, msg.Order, isCompare);
@@ -447,7 +463,7 @@ namespace BlazorApp4.Services
             else
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
-                var msg = context.Messages
+                msg = context.Messages
                             .Include(m => m.Versions)
                             .FirstOrDefault(m => m.Id == messageId);
                 if (msg == null)
@@ -544,10 +560,7 @@ namespace BlazorApp4.Services
         }
         private async Task<ChatDb?> GetFullChat(int chatId, bool isCompare = false)
         {
-            if (CurrentChatDbId == CompareWithChatId && CurrentChatDbId == chatId)
-            {
-                if (isCompare) return CompareWithChat;
-            }
+            Console.WriteLine($"[ChatService GetFullChat] load from base; id: {chatId}");
             await using var context = await _contextFactory.CreateDbContextAsync();
 
             var chat = await context.Chats
@@ -556,10 +569,34 @@ namespace BlazorApp4.Services
                         .ThenInclude(v => v.Snapshot)
                             .ThenInclude(s => s.Entries)
                 .FirstOrDefaultAsync(c => c.Id == chatId);
+
+            if (CurrentChatDbId == CompareWithChatId && CurrentChatDbId == chatId)
+            {
+                if (isCompare)
+                {
+                    foreach (var msg in chat.Messages)
+                    {
+                        var curMsg = CompareWithChat.Messages.FirstOrDefault(m => m.Id == msg.Id);
+                        if (curMsg == null) continue;
+                        msg.CurrentVersionOrder = curMsg.CurrentVersionOrder;
+                    }
+                }
+                else
+                {
+                    foreach (var msg in chat.Messages)
+                    {
+                        var curMsg = CurrentChatDb.Messages.FirstOrDefault(m => m.Id == msg.Id);
+                        if (curMsg == null) continue;
+                        msg.CurrentVersionOrder = curMsg.CurrentVersionOrder;
+                    }
+                }
+            }
+
             return chat;
         }
         private async Task UpdateContextShiftAfterEditAsync(int chatId, int editedMsgOrder, bool isCompare = false)
         {
+            Console.WriteLine($"[ChatService UpdateContextShiftAfterEditAsync] start");
             var chat = await GetFullChat(chatId, isCompare);
             if (chat == null)
             {
@@ -571,9 +608,14 @@ namespace BlazorApp4.Services
             var lookup = chat.Messages.ToDictionary(m => m.Id);
             foreach (var m in chat.Messages.OrderBy(m => m.Order))
             {
-                if (m.Order < editedMsgOrder) continue;
+                if (m.Order <= editedMsgOrder) continue;
                 var curVers = m.GetCurrentVersion();
-                if (curVers.Snapshot?.Entries == null) continue;
+                if (curVers.Snapshot?.Entries == null)
+                {
+
+                    Console.WriteLine($"[ChatService UpdateContextShiftAfterEditAsync] Entries is null");
+                    continue; 
+                }
                 int count = 0;
                 foreach (var entry in curVers.Snapshot!.Entries)
                 {
@@ -807,7 +849,7 @@ namespace BlazorApp4.Services
             CompareWithChatId = chatId;
 
             if (chatId == CurrentChatDbId) CompareWithChat = new ChatDb(CurrentChatDb);
-            else CompareWithChat = chatId == null ? null : await GetChatById((int)chatId);
+            else CompareWithChat = chatId == null ? null : await GetFullChatById((int)chatId);
 
             Console.WriteLine($"ChatService chatId == null ? ({chatId == null})");
 
@@ -820,6 +862,145 @@ namespace BlazorApp4.Services
                 ResetCompareAlignment();
             }
             OnComparisonChanged?.Invoke(chatId != null);
+        }
+
+        //public async Task CreateBranchAsync(int chatId, int messageId, bool isCompare = false, bool fullCopy = true)
+        //{
+        //    var chat = await GetFullChatById(chatId);
+
+        //    var targetMessage = chat.Messages.FirstOrDefault(m => m.Id == messageId);
+        //    if (targetMessage == null) return;
+
+        //    var newChat = new ChatDb($"Chat {DbChats.Count + 1} (ветка)");
+        //    using var context = _contextFactory.CreateDbContext();
+
+        //    foreach (var mes in chat.Messages.OrderBy(m => m.Order))
+        //    {
+        //        if (mes.Order > targetMessage.Order) continue;
+        //        MessageDb newMes = new MessageDb
+        //        {
+        //            Role = mes.Role,
+        //            Order = mes.Order,
+        //            CurrentVersionOrder = mes.CurrentVersionOrder
+        //        };
+        //        foreach (var v in mes.Versions)
+        //        {
+        //            var newVers = VersionDb.CreateCleanVersion(v);
+        //            newMes.Versions.Add(newVers);
+        //        }
+        //        newChat.Messages.Add(new(mes));
+        //    }
+        //    newChat.Name = $"Chat {DbChats.Count + 1}";
+        //    Console.WriteLine($"[DEBUG AddChatAsync] ПЕРЕД ДОБАВЛЕНИЕМ: chat.Id = {newChat.Id}");
+        //    await context.Chats.AddAsync(newChat);
+        //    await context.SaveChangesAsync();
+        //    await RefreshDbChatsAsync();
+        //    NotifyStateChanged();
+        //}
+        public async Task CreateBranchAsync(int chatId, int messageId, bool isCompare = false, bool fullCopy = true)
+        {
+            //var chat = await GetFullChatById(chatId);
+            using var context = _contextFactory.CreateDbContext();
+            var chat = context.Chats
+                            .Include(c => c.Messages)
+                                .ThenInclude(m => m.Versions)
+                                    .ThenInclude(v => v.Snapshot)
+                                        .ThenInclude(s => s.Entries)
+                                            .ThenInclude(e => e.Message) // Обязательно!
+                            .Include(c => c.Messages)
+                                .ThenInclude(m => m.Versions)
+                                    .ThenInclude(v => v.Snapshot)
+                                        .ThenInclude(s => s.Entries)
+                                            .ThenInclude(e => e.Version)
+                        .FirstOrDefault(c => c.Id == chatId);
+            var targetMessage = chat.Messages.FirstOrDefault(m => m.Id == messageId);
+            if (targetMessage == null) return;
+
+            var newChat = new ChatDb
+            {
+                Name = $"Chat {DbChats.Count + 1} (ветка)",
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            // Словарь для быстрого поиска НОВЫХ версий по их Order (и Order родительского сообщения)
+            // Ключ: (Order сообщения, Order версии) -> Значение: Новая версия
+            var newVersionsLookup = new Dictionary<(int msgOrder, int verOrder), VersionDb>();
+
+            // ==========================================================
+            // ШАГ 1: Создаем структуру новых сообщений и версий
+            // ==========================================================
+            foreach (var mes in chat.Messages.OrderBy(m => m.Order))
+            {
+                if (mes.Order > targetMessage.Order) continue;
+
+                var newMes = MessageDb.CreateCleanMessage(mes);
+
+                foreach (var v in newMes.Versions)
+                {
+                    newVersionsLookup[(mes.Order, v.Order)] = v;
+                }
+
+                newChat.Messages.Add(newMes);
+            }
+
+
+            // ==========================================================
+            // ШАГ 2: Копируем снапшоты, привязывая их к НОВЫМ объектам
+            // ==========================================================
+            foreach (var newMes in newChat.Messages)
+            {
+                foreach (var newVer in newMes.Versions)
+                {
+                    // Находим оригинальную версию, чтобы взять из нее данные
+                    var originalMes = chat.Messages.First(m => m.Order == newMes.Order);
+                    var originalVer = originalMes.Versions.First(v => v.Order == newVer.Order);
+
+                    // 2.1. Копируем основной снапшот версии
+                    if (originalVer.Snapshot != null)
+                    {
+                        var newSnapshot = new ChatSnapshot
+                        {
+                            CreatedAt = originalVer.Snapshot.CreatedAt,
+                            Entries = new List<SnapshotEntry>(),
+                            Chat = newChat
+                        };
+
+                        foreach (var originalEntry in originalVer.Snapshot.Entries)
+                        {
+                            // Ищем НОВУЮ версию, на которую должна указывать эта запись, по её Order
+                            var targetNewVer = newVersionsLookup.GetValueOrDefault((originalEntry.Message.Order, originalEntry.Version.Order));
+
+                            if (targetNewVer != null)
+                            {
+                                var newEntry = new SnapshotEntry
+                                {
+                                    // Id, SnapshotId НЕ копируем.
+                                    // Мы присваиваем ссылки на ОБЪЕКТЫ, а EF Core сам превратит их в MessageId и VersionId при сохранении!
+                                    Message = targetNewVer.Message,
+                                    Version = targetNewVer,
+                                    Snapshot = newSnapshot
+                                };
+                                newSnapshot.Entries.Add(newEntry);
+                            }
+                        }
+                        newVer.Snapshot = newSnapshot;
+                    }
+                }
+            }
+
+            // ==========================================================
+            // ШАГ 3: Сохранение в базу
+            // ==========================================================
+
+            Console.WriteLine($"[ChatService CreateBrunch] newChat.Id перед добавлением: {newChat.Id}");
+
+            await context.Chats.AddAsync(newChat);
+            await context.SaveChangesAsync(); // EF Core сам проставит все Id, ChatId, MessageId, VersionId, SnapshotId
+
+            Console.WriteLine($"[ChatService CreateBrunch] Успешно создана ветка с новым ChatId = {newChat.Id}");
+
+            await RefreshDbChatsAsync();
+            NotifyStateChanged();
         }
     }
 }

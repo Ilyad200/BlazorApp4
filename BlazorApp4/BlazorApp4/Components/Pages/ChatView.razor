@@ -192,7 +192,23 @@
                                 {
                                     <span class="similarity-chip medium">@FormatSimilarity(diffResult.Similarity)</span>
                                 }
+                                @*////////////////////////////*@
+                                <!-- Кнопка дополнительного меню -->
+                                <div style="position: relative; display: inline-block;">
+                                    <button class="icon-btn more-actions" title="Дополнительные действия" @onclick="() => ToggleMenu(msg.Id)">
+                                        ⋮
+                                    </button>
 
+                                    @if (openMenuMessageId == msg.Id)
+                                    {
+                                        <!-- Прозрачный оверлей для закрытия меню при клике вне его -->
+                                        <div class="menu-overlay" @onclick="() => openMenuMessageId = null"></div>
+                                        <div class="popup-menu">
+                                            <button class="popup-menu-item danger" @onclick="() => DeleteVersion(msg)">Удалить версию</button>
+                                            <button class="popup-menu-item" @onclick="() => CreateBranch(msg)">Создать ветку</button>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         }
                     </div>
@@ -705,5 +721,32 @@
         {
             await SaveEdit(messageId);
         }
+    }
+    //////////////////////////////////// <summary>
+    /// QWEN
+    /// </summary>
+
+    private int? openMenuMessageId;
+
+    private void ToggleMenu(int messageId)
+    {
+        // Если меню этого сообщения уже открыто, закрываем его, иначе открываем
+        openMenuMessageId = openMenuMessageId == messageId ? null : messageId;
+    }
+
+    private async Task DeleteVersion(MessageDb msg)
+    {
+        // TODO: Замените на реальный вызов вашего сервиса
+        // await ChatService.DeleteVersionAsync(msg.Id, msg.GetCurrentVersion().Id);
+        Console.WriteLine($"[Заглушка] Удаление версии {msg.GetCurrentVersion().Id} сообщения {msg.Id}");
+        openMenuMessageId = null; // Закрываем меню после действия
+    }
+
+    private async Task CreateBranch(MessageDb msg)
+    {
+        // TODO: Замените на реальный вызов вашего сервиса
+        await ChatService.CreateBranchAsync(Chat.Id, msg.Id);
+        Console.WriteLine($"[Заглушка] Создание ветки от версии {msg.GetCurrentVersion().Id} сообщения {msg.Id}");
+        openMenuMessageId = null; // Закрываем меню после действия
     }
 }

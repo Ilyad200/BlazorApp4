@@ -24,6 +24,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
     options.UseNpgsql(connectionString);
+    options.EnableSensitiveDataLogging();
+    options.EnableDetailedErrors();
 });
 
 var app = builder.Build();

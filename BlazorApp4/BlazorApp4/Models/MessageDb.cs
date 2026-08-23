@@ -53,5 +53,20 @@ namespace BlazorApp4.Models
         {
             return Versions.FirstOrDefault(v => v.Order == CurrentVersionOrder)!;
         }
+
+        public static MessageDb CreateCleanMessage(MessageDb other)
+        {
+            var newMes = new MessageDb
+            {
+                Role = other.Role,
+                Order = other.Order,
+                CurrentVersionOrder = other.CurrentVersionOrder
+            };
+            foreach (var v in other.Versions)
+            {
+                newMes.Versions.Add(VersionDb.CreateCleanVersion(v));
+            }
+            return newMes;
+        }
     }
 }

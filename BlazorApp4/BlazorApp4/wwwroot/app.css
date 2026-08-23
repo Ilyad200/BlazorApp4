@@ -497,7 +497,7 @@ input.input-message::placeholder {
     }
 
 .model-selector-add {
-    font-weight: 600;*/
+    font-weight: 600;
     color: var(--text-faint);
     border-top: 1px solid var(--hair);
     margin-top: 4px;
@@ -1215,7 +1215,7 @@ mark.diff-unique {
     gap: 14px;
     overflow-x: hidden;
 }
-}
+
 /* message card */
 .msg {
     max-width: 78%;
@@ -1454,4 +1454,84 @@ mark.diff-unique {
 }
 .msg.assistant .msg-row{
   flex-direction:row-reverse;
+}
+
+
+
+
+/*////////////////////////////////////////////////*/
+/*/Qwen*/
+
+.menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1040;
+    /* Прозрачный, но перехватывает клики для закрытия меню */
+}
+
+.popup-menu {
+    position: absolute;
+    bottom: 120%;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    overflow: hidden;
+    animation: fadeIn 0.15s ease-out;
+}
+
+.popup-menu-item {
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--text);
+    transition: background-color 0.15s;
+}
+
+    .popup-menu-item:hover {
+        background-color: var(--surface-2);
+        color: #0d6efd;
+    }
+
+    /* Класс danger для деструктивных действий (удаление) */
+    .popup-menu-item.danger {
+        color: #df5555;
+    }
+
+        .popup-menu-item.danger:hover {
+            background-color: var(--surface-2);
+            color: #dc3545;
+        }
+
+.more-actions {
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* В Blazor-файлах символ @ экранируется как @@ */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
