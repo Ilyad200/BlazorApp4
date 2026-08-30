@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
 using OpenRouter.NET.Models;
+using System.Collections;
 
 namespace BlazorApp4.Services
 {
@@ -25,6 +26,10 @@ namespace BlazorApp4.Services
 
         private Dictionary<int, int> VersionsCasheMain = new();
         private Dictionary<int, int> VersionsCasheCompare = new();
+
+
+        private List<double> messagesDiffs = new List<double>();
+
 
         public ChatComparison? CurrentComparison { get; private set; }
         public MessageDb? LeftMessageToStartCompare { get; private set; }
@@ -224,7 +229,7 @@ namespace BlazorApp4.Services
         }
         private async Task RefreshChatSlot(int chatId, bool isCompare = false)
         {
-            var chat = await GetChatById(chatId);
+            var chat = await GetFullChatById(chatId);
 
             
             if (CompareWithChat != null && CompareWithChat.Id == chatId)
@@ -508,54 +513,27 @@ namespace BlazorApp4.Services
             }
         }
 
-        public async Task PreviousVersions(int chatId, VersionDb lastVersion)
+        public async Task PreviousVersions(int chatId, VersionDb lastVersion, bool isCompare = false)
         {
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.WriteLine("ChatService SetPreviousVersions: start");
-            Console.ResetColor();
-            using var context = await _contextFactory.CreateDbContextAsync();
-            ChatDb? chat = await context.Chats.Include(c => c.Messages)
-                            .ThenInclude(m => m.Versions)
-                            .FirstOrDefaultAsync(c => c.Id == chatId);
-            if (chat == null)
+            ChatDb? chat = isCompare ? CompareWithChat : CurrentChatDb;
+            ChatSnapshot? snapshot = lastVersion.Snapshot;
+
+            if (snapshot == null || snapshot.Entries == null)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[ChatService PreviousVersions] Chat is null");
-                Console.ResetColor();
-                return;
+                using var context = await _contextFactory.CreateDbContextAsync();
+                snapshot = await context.ChatSnapshots
+                    .Include(s => s.Entries)
+                    .FirstOrDefaultAsync(s => s.Id == lastVersion.SnapshotId);
             }
 
-            ChatSnapshot? snapshot = await context.ChatSnapshots
-                                        .Include(s => s.Entries)
-                                        .FirstOrDefaultAsync(s => s.Id == lastVersion.SnapshotId);
-            if (snapshot == null)
+            if (snapshot == null || snapshot.Entries == null)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ChatService PreviousVersions] Snapshot is null (id: {lastVersion.SnapshotId}, versionId: {lastVersion.Id})");
-                Console.ResetColor();
                 return;
             }
-            if (snapshot!.Entries == null)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[ChatService PreviousVersions] snapshot.Entries is null");
-                Console.ResetColor();
-                return;
-            }
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[ChatService PreviousVersions] snapshot Entries count: {snapshot!.Entries.Count}");
-            Console.WriteLine($"[ChatService PreviousVersions] snapshot Id: {snapshot.Id}");
-            Console.ResetColor();
-            //var messages = chat.Messages;
             foreach (var entry in snapshot.Entries!)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[ChatService PreviousVersions] entry id: {entry.Id}; messageId: {entry.MessageId}");
-                Console.ResetColor();
-                await SwitchToVersionAsync(chatId, entry.MessageId, entry.VersionId);
+                await SwitchToVersionAsync(chatId, entry.MessageId, entry.VersionId, isCompare);
             }
-            Console.ResetColor();
             NotifyStateChanged();
         }
         private async Task<ChatDb?> GetFullChat(int chatId, bool isCompare = false)
@@ -608,7 +586,7 @@ namespace BlazorApp4.Services
             var lookup = chat.Messages.ToDictionary(m => m.Id);
             foreach (var m in chat.Messages.OrderBy(m => m.Order))
             {
-                if (m.Order <= editedMsgOrder) continue;
+                if (m.Order < editedMsgOrder) continue;
                 var curVers = m.GetCurrentVersion();
                 if (curVers.Snapshot?.Entries == null)
                 {
@@ -899,26 +877,26 @@ namespace BlazorApp4.Services
         //}
         public async Task CreateBranchAsync(int chatId, int messageId, bool isCompare = false, bool fullCopy = true)
         {
-            //var chat = await GetFullChatById(chatId);
+            var chat = await GetFullChatById(chatId);
             using var context = _contextFactory.CreateDbContext();
-            var chat = context.Chats
-                            .Include(c => c.Messages)
-                                .ThenInclude(m => m.Versions)
-                                    .ThenInclude(v => v.Snapshot)
-                                        .ThenInclude(s => s.Entries)
-                                            .ThenInclude(e => e.Message) // Обязательно!
-                            .Include(c => c.Messages)
-                                .ThenInclude(m => m.Versions)
-                                    .ThenInclude(v => v.Snapshot)
-                                        .ThenInclude(s => s.Entries)
-                                            .ThenInclude(e => e.Version)
-                        .FirstOrDefault(c => c.Id == chatId);
+            //var chat = context.Chats
+            //                .Include(c => c.Messages)
+            //                    .ThenInclude(m => m.Versions)
+            //                        .ThenInclude(v => v.Snapshot)
+            //                            .ThenInclude(s => s.Entries)
+            //                                .ThenInclude(e => e.Message) // Обязательно!
+            //                .Include(c => c.Messages)
+            //                    .ThenInclude(m => m.Versions)
+            //                        .ThenInclude(v => v.Snapshot)
+            //                            .ThenInclude(s => s.Entries)
+            //                                .ThenInclude(e => e.Version)
+            //            .FirstOrDefault(c => c.Id == chatId);
             var targetMessage = chat.Messages.FirstOrDefault(m => m.Id == messageId);
             if (targetMessage == null) return;
 
             var newChat = new ChatDb
             {
-                Name = $"Chat {DbChats.Count + 1} (ветка)",
+                Name = $"Chat {DbChats.Count + 1} (ветка чата \"{chat.Name}\")",
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
@@ -1002,5 +980,8 @@ namespace BlazorApp4.Services
             await RefreshDbChatsAsync();
             NotifyStateChanged();
         }
+
+
+        
     }
 }

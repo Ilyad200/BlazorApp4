@@ -64,7 +64,9 @@ namespace BlazorApp4.Models
             };
             foreach (var v in other.Versions)
             {
-                newMes.Versions.Add(VersionDb.CreateCleanVersion(v));
+                var newVers = VersionDb.CreateCleanVersion(v);
+                newVers.Message = newMes;
+                newMes.Versions.Add(newVers);
             }
             return newMes;
         }

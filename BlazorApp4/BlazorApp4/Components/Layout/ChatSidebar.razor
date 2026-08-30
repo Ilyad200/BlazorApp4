@@ -23,7 +23,7 @@
                     role="button">
                 <div class="reel-body">
                     <div class="reel-info">
-                        <span class="reel-name">@chat.Name</span>
+                        <span class="reel-name" title="@chat.Name">@chat.Name</span>
                         <div class="reel-meta">@chat.Messages.Count сообщ.</div>
                     </div>
                     @if (hoveredChatId == chat.Id && ChatService.CurrentChatDb != null)

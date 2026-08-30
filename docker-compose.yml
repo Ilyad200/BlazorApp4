@@ -10,13 +10,17 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - OpenRouter__ApiKey=${OPENROUTER_APIKEY}
+      # Добавляем адрес Ollama для внутреннего общения между контейнерами
+      - Ollama__Endpoint=http://ollama:11434
     dns:
       - 8.8.8.8
       - 1.1.1.1
     ports:
-      - "8080:8081"   # пример, если нужно
+      - "8080:8081"
     depends_on:
       - db
+      - ollama # Ждем запуска ollama перед стартом приложения
+    restart: unless-stopped
 
   db:
     image: postgres:latest
@@ -28,8 +32,21 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Исправлен путь на стандартный и более безопасный для PostgreSQL
       - postgres_data:/var/lib/postgresql
     restart: always
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434" # Порт для доступа к API Ollama
+    volumes:
+      - ollama_data:/root/.ollama # Сохраняем модели, чтобы не скачивать их каждый раз
+    restart: unless-stopped
+    # При первом запуске скачиваем легкую модель, затем запускаем сервер
+    # command: sh -c "ollama pull all-minilm && ollama serve"
+
 volumes:
   postgres_data:
+  ollama_data: # Новый том для хранения весов моделей Ollama

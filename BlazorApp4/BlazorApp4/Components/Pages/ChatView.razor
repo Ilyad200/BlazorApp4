@@ -7,6 +7,7 @@
 @inject PinService PinService
 @inject CompareScrollService CompareScrollService
 @inject IJSRuntime JS
+@inject SemanticComparisonService SemanticComparisonService;
 @implements IAsyncDisposable
 
 <div class="chat-view-root stream @(IsCompare ? 'b' : 'a')">
@@ -98,12 +99,8 @@
                             var diffResult = GetDiffAgainstCounterpart(msg);
                         }
                         <div class="msg-tag">
-                            <span class="led @(contextShift != null
-                                            ? @GetStalenessClass(contextShift)
-                                            : "")"
-                            title="@(contextShift != null
-                                            ? @GetStalenessTitle(contextShift)
-                                            : "")">
+                            <span class="led @GetStalenessClass(contextShift)"
+                            title="@GetStalenessTitle(contextShift)">
                             </span>
                             <span class="model-name">@(msg.Role == "assistant" ? msg.Versions.OrderBy(v => v.Order).First(v => v.Order == msg.GetCurrentVersion().Order).Model : "")</span>
 
@@ -133,7 +130,8 @@
                                     <span class="compare-start-marker">📍 Начало сравнения</span>
                                 }
                                 <div class="bubble">
-                                    @RenderMessageContent(msg, diffResult)
+                                    @*@RenderMessageContent(msg, diffResult)*@
+                                    @msg.GetCurrentVersion().Content
                                 </div>
                             </div>
                             <div class="msg-foot">
@@ -188,10 +186,11 @@
                                         0
                                     </button>
                                 }
-                                @if (diffResult != null)
-                                {
-                                    <span class="similarity-chip medium">@FormatSimilarity(diffResult.Similarity)</span>
-                                }
+                                <button class="icon-btn copy-content"
+                                        title="Копировать содержимое"
+                                        @onclick="() => CopyToClipboard(msg.GetCurrentVersion().Content, msg.Id)">
+                                    @(copiedMessageId == msg.Id ? "✅" : "📋")
+                                </button>
                                 @*////////////////////////////*@
                                 <!-- Кнопка дополнительного меню -->
                                 <div style="position: relative; display: inline-block;">
@@ -209,6 +208,11 @@
                                         </div>
                                     }
                                 </div>
+                                @if (diffResult != null && messagesDiffs.Count > 0)
+                                {
+                                    <span class="similarity-chip medium">@*@FormatSimilarity(diffResult.Similarity)*@@GetDiffForMes(msg)</span>
+                                }
+                                <span class="similarity-chip medium">50%</span>
                             </div>
                         }
                     </div>
@@ -392,6 +396,10 @@
 
     private bool showSystem = false;
 
+    private List<double> messagesDiffs = new List<double>();
+
+    private int? copiedMessageId;
+
     private MessageDb? GetCounterpartMessage(MessageDb msg)
     {
         if (CounterpartChat == null || !ChatService.IsCompareAligned) return null;
@@ -412,7 +420,31 @@
         if (counterpart == null) return null;
         return TextDiffService.Compare(msg.GetCurrentVersion().Content, counterpart.GetCurrentVersion().Content);
     }
+    private async void GetDiff()
+    {
+        messagesDiffs.Clear();
+        if (Chat == null || CounterpartChat == null ||
+            ChatService.CompareStartOrderCompare == null || ChatService.CompareStartOrderMain == null)
+            return;
+        var chat = IsCompare ? CounterpartChat : Chat;
+        var secondChat = IsCompare ? Chat : CounterpartChat;
+        messagesDiffs = 
+                await SemanticComparisonService.CompareAsync(
+                    chat, secondChat, (int)ChatService.CompareStartOrderMain, (int)ChatService.CompareStartOrderCompare);
 
+        StateHasChanged();
+    }
+    private string GetDiffForMes(MessageDb mes)
+    {
+        if (ChatService.CompareStartOrderCompare == null || ChatService.CompareStartOrderMain == null || messagesDiffs.Count == 0)
+            return "null";
+        int targetIndex = mes.Order - 
+                    (IsCompare ? (int)ChatService.CompareStartOrderCompare : (int)ChatService.CompareStartOrderMain);
+
+        Console.WriteLine("GetDiffForMessage");
+        //StateHasChanged();
+        return (Math.Round(messagesDiffs[targetIndex] * 100, 1)).ToString() + "%";
+    }
     private MarkupString RenderMessageContent(MessageDb msg, TextDiffService.DiffResult? diff)
     {
         if (diff != null)
@@ -478,6 +510,7 @@
         ChatService.OnComparisonChanged += OnCompareChanged;
         ChatService.OnChange += StateHasChanged;
         ChatService.OnCompareStart += SetOffset;
+        ChatService.OnCompareStart += GetDiff;
         PinService.OnChange += StateHasChanged;
 
         CompareScrollService.OnChanged += OnCompareScrollChanged;
@@ -488,6 +521,7 @@
         ChatService.OnComparisonChanged -= OnCompareChanged;
         ChatService.OnChange -= StateHasChanged;
         ChatService.OnCompareStart -= SetOffset;
+        ChatService.OnCompareStart -= GetDiff;
         PinService.OnChange -= StateHasChanged;
 
         CompareScrollService.OnChanged -= OnCompareScrollChanged;
@@ -537,7 +571,6 @@
                 scrollElement);
 
             lastEnabled = CompareScrollService.IsEnabled;
-
         }
     }
 
@@ -675,6 +708,18 @@
         if (newVers == null) return;
         await ChatService.SwitchToVersionAsync(Chat.Id, messageId, newVers.Id, isCompare: IsCompare);
 
+        // if (messagesDiffs.Count > 0 && ChatService.CompareStartOrderCompare != null && ChatService.CompareStartOrderMain != null && CounterpartChat != null)
+        // {
+        //     int targetIndex = msg.Order -
+        //                         (IsCompare ? (int)ChatService.CompareStartOrderCompare : (int)ChatService.CompareStartOrderMain);
+        //     var firstMessage = IsCompare ? CounterpartChat.Messages.FirstOrDefault(m => m.Order == msg.Order - ChatService.CompareStartOrderCompare + ChatService.CompareStartOrderMain) : msg;
+        //     var secondMessage = IsCompare ? msg : CounterpartChat.Messages.FirstOrDefault(m => m.Order == msg.Order - ChatService.CompareStartOrderMain + ChatService.CompareStartOrderCompare);
+        //     if (firstMessage == null || secondMessage == null)
+        //         return;
+
+        //     messagesDiffs[targetIndex] = (await SemanticComparisonService.RecalculateSingleMessageAsync(firstMessage, secondMessage) ?? 0.0);
+        // }
+
         // Console.ForegroundColor = ConsoleColor.Blue;
         // Console.WriteLine("ChatView SetPreviousVersions: start");
         // Console.WriteLine($"ChatView SetPreviousVersions: {messageId}, {versionOrder}");
@@ -682,7 +727,7 @@
     }
     private async Task SetPreviousVersions(int chatId, VersionDb version)
     {
-        await ChatService.PreviousVersions(chatId, version);
+        await ChatService.PreviousVersions(chatId, version, IsCompare);
         StateHasChanged();
     }
     private void SelectComparePoint(MessageDb msg)
@@ -748,5 +793,27 @@
         await ChatService.CreateBranchAsync(Chat.Id, msg.Id);
         Console.WriteLine($"[Заглушка] Создание ветки от версии {msg.GetCurrentVersion().Id} сообщения {msg.Id}");
         openMenuMessageId = null; // Закрываем меню после действия
+    }
+
+
+    private async Task CopyToClipboard(string content, int messageId)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", content);
+            copiedMessageId = messageId;
+            StateHasChanged();
+
+            // Возвращаем иконку через 2 секунды
+            await Task.Delay(2000);
+            copiedMessageId = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ChatView] Ошибка копирования: {ex.Message}");
+            errorMessage = "Не удалось скопировать содержимое";
+            StateHasChanged();
+        }
     }
 }

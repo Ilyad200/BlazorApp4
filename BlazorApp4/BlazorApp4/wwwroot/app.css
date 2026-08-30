@@ -114,6 +114,8 @@ article {
     flex: 1;
     overflow-y: auto;
     padding: 8px;
+    width: 120px; /* Или max-width: 300px; */
+    flex-shrink: 0; /* Запрещаем сжиматься меньше этого размера */
 }
     .rail-list::-webkit-scrollbar {
         width: 4px;
@@ -165,6 +167,7 @@ article {
 .reel-info {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 .reel-name {
     font-size: 13.5px;
@@ -1535,3 +1538,15 @@ mark.diff-unique {
         transform: translateY(0);
     }
 }
+
+.copy-content {
+    transition: transform 0.15s ease;
+}
+
+    .copy-content:hover {
+        transform: scale(1.1);
+    }
+
+    .copy-content:active {
+        transform: scale(0.95);
+    }

@@ -28,6 +28,9 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.EnableDetailedErrors();
 });
 
+builder.Services.AddScoped<SemanticComparisonService>();
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
