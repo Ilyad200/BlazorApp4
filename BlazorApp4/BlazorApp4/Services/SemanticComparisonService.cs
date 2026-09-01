@@ -6,16 +6,16 @@ namespace BlazorApp4.Services
 {
     public class SemanticComparisonService
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<SemanticComparisonService> _logger;
 
         // Если Blazor запущен локально (dotnet run): "http://localhost:11434/api/embeddings"
         // Если Blazor запущен в Docker: "http://ollama:11434/api/embeddings"
         private readonly string _ollamaUrl = "http://ollama:11434/api/embeddings";
 
-        public SemanticComparisonService(HttpClient httpClient, ILogger<SemanticComparisonService> logger)
+        public SemanticComparisonService(IHttpClientFactory httpClientFactory, ILogger<SemanticComparisonService> logger)
         {
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _logger = logger;
         }
 
@@ -68,15 +68,16 @@ namespace BlazorApp4.Services
 
         private async Task<List<float[]>> GetEmbeddingsBatchAsync(List<MessageDb> messages)
         {
+            var httpClient = _httpClientFactory.CreateClient();
             var tasks = messages.Select(async message =>
             {
                 var text = message.GetCurrentVersion()?.Content ?? "";
                 if (string.IsNullOrWhiteSpace(text)) return Array.Empty<float>();
 
-                var payload = new { model = "nomic-embed-text", prompt = text };
+                var payload = new { model = "embeddinggemma:latest", prompt = text };
                 try
                 {
-                    var response = await _httpClient.PostAsJsonAsync(_ollamaUrl, payload);
+                    var response = await httpClient.PostAsJsonAsync(_ollamaUrl, payload);
                     response.EnsureSuccessStatusCode();
                     var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>();
                     return result?.Embedding ?? Array.Empty<float>();
@@ -93,8 +94,8 @@ namespace BlazorApp4.Services
         /// <summary>
         /// Пересчитывает соответствие только для одного измененного сообщения
         /// </summary>
-        public async Task<double?> RecalculateSingleMessageAsync(
-            MessageDb firstMessage, MessageDb secondMessage)
+        public async Task<double> RecalculateSingleMessageAsync(
+            string firstMessage, string secondMessage)
         {
 
             // Получаем векторы только для этих двух сообщений
@@ -107,36 +108,30 @@ namespace BlazorApp4.Services
             var rightEmbedding = await secondEmbeddingTask;
 
             if (leftEmbedding == null || rightEmbedding == null)
-                return null;
+                return 0;
 
-            return CalculateCosineSimilarity([(float)leftEmbedding], [(float)rightEmbedding]);
+            return CalculateCosineSimilarity(leftEmbedding, rightEmbedding);
         }
 
         /// <summary>
         /// Получает вектор для одного сообщения
         /// </summary>
-        private async Task<float?> GetEmbeddingAsync(MessageDb message)
+        private async Task<float[]> GetEmbeddingAsync(string text)
         {
-            var text = message.GetCurrentVersion()?.Content ?? "";
-            if (string.IsNullOrWhiteSpace(text)) return null;
+            if (string.IsNullOrWhiteSpace(text)) return Array.Empty<float>();
 
-            var payload = new
-            {
-                model = "nomic-embed-text",
-                input = text
-            };
-
+            var httpClient = _httpClientFactory.CreateClient();
+            var payload = new { model = "embeddinggemma:latest", prompt = text };
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(_ollamaUrl, payload);
+                var response = await httpClient.PostAsJsonAsync(_ollamaUrl, payload);
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>();
-                return result?.Embedding?.FirstOrDefault();
+                return result?.Embedding ?? Array.Empty<float>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка векторизации сообщения {MessageId}", message.Id);
-                return null;
+                return Array.Empty<float>();
             }
         }
         private double CalculateCosineSimilarity(float[] vec1, float[] vec2)

@@ -28,8 +28,8 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.EnableDetailedErrors();
 });
 
-builder.Services.AddScoped<SemanticComparisonService>();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient(); // регистрируем фабрику
+builder.Services.AddSingleton<SemanticComparisonService>();
 
 var app = builder.Build();
 

@@ -66,8 +66,8 @@
                         Сбросить
                     </button>
                     <span class="label">сходство</span>
-                    <div class="corr-bar"><i style="width: @(Math.Round(GetAverageSimilarity().Value * 100))%"></i></div>
-                    <span class="corr-val">@(Math.Round(GetAverageSimilarity().Value * 100))%</span>
+                    <div class="corr-bar"><i style="width: @(Math.Round(GetAverageSimilarity() * 100))%"></i></div>
+                    <span class="corr-val">@(Math.Round(GetAverageSimilarity() * 100))%</span>
                 </div>
             }
         </div>
@@ -110,32 +110,6 @@
             </SplitView>
         </div>
     </div>
-    @* <ResizableDiv @bind-LeftWidth="outerLeftWidth"
-          @bind-IsRightContentVisible="outerVisible"
-          MinLeftWidth="20" MaxLeftWidth="80">
-        <LeftContent>
-            <!-- Внутренний сплиттер (вложен в левую панель внешнего) -->
-                <ResizableDiv @bind-LeftWidth="innerLeftWidth"
-                      @bind-IsRightContentVisible="innerVisible"
-                      MinLeftWidth="20" MaxLeftWidth="80">
-                <LeftContent>
-                    <ChatView />
-                </LeftContent>
-                <RightContent>
-                    @if (isCompareChatVisible)
-                    {
-                        <ChatView IsCompare="true" />
-                    }
-                </RightContent>
-            </ResizableDiv>
-        </LeftContent>
-        <RightContent>
-            @if (isPinnedMessagesVisible)
-            {
-                <PinnedMessageView />
-            }
-        </RightContent>
-    </ResizableDiv> *@
 
 </div>
 
@@ -144,31 +118,17 @@
     private double[] _sizesBetweenChats = [50, 50];
     private double[] _sizesBetweenChatsAndPin = [70, 30];
 
-
-    private int outerLeftWidth = 100;
-    private int lastOuterLeftWidth = 70;
-    private bool outerVisible = false;
-
-    private int innerLeftWidth = 50;
-    private int lastInnerLeftWidth = 50;
-    private bool innerVisible = false;
-
-
     private int Width = 50;
     private int Height = 200;
     private DotNetObjectReference<AIComponent>? dotNetRef;
     private ElementReference elementRef;
-    private List<double> widths = new() { 33.33, 33.33, 33.34 };
-    private bool isCompareChatVisible = false;
-    private bool isPinnedMessagesVisible = false;
-
-    private readonly string outerKey = "outer";
 
 
     protected override void OnInitialized()
     {
         ChatService.OnComparisonChanged += OnCompareChanged;
         ChatService.OnChange += StateHasChanged;
+        ChatService.OnMessagesDiffsChange += StateHasChanged;
         PinService.OnChange += OnPinnedMessage;
     }
 
@@ -176,6 +136,7 @@
     {
         ChatService.OnComparisonChanged -= OnCompareChanged;
         ChatService.OnChange -= StateHasChanged;
+        ChatService.OnMessagesDiffsChange -= StateHasChanged;
         PinService.OnChange -= OnPinnedMessage;
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -183,34 +144,17 @@
         if (firstRender)
         {
             dotNetRef = DotNetObjectReference.Create(this);
-            //await JSRuntime.InvokeVoidAsync("splitterHandler.init", elementRef, dotNetRef);
-            // await JSRuntime.InvokeVoidAsync(
-            //             "compareScroll.init",
-            //             "main-chat",
-            //             "compare-chat");
         }
         Console.WriteLine($"CompareWithChatId: {(ChatService.CompareWithChatId == null ? "null" : ChatService.CompareWithChatId.ToString())}; AIComponent");
     }
 
     private void OnCompareChanged(bool isCompare)
     {
-        isCompareChatVisible = isCompare;
-        if (!isCompare) lastInnerLeftWidth = innerLeftWidth;
-        innerLeftWidth = isCompare ? 50 : 100;
-        Console.WriteLine($"AIComponent Compare change: {isCompare}");
-        //isPinnedMessagesVisible = PinService.PinnedMessageList.Count > 0;
         StateHasChanged();
     }
 
     private void OnPinnedMessage()
     {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("AIComponent OnPinnedMessage");
-        Console.WriteLine($"Count pinned: {PinService.PinnedMessageList.Count}");
-        Console.ResetColor();
-
-        isPinnedMessagesVisible = PinService.PinnedMessageList.Count > 0;
-        outerLeftWidth = isPinnedMessagesVisible ? 70 : 100;
         StateHasChanged();
     }
 
@@ -218,16 +162,13 @@
     {
         Width = newSize.Width;
         Height = newSize.Height;
-        // Здесь можно обновить другие элементы страницы
 
     }
     private async Task Toggle()
     {
-        Console.WriteLine("Toggle");
         CompareScrollService.Toggle();
         isSyncEnabled = !isSyncEnabled;
 
-        Console.WriteLine(isSyncEnabled);
         await JSRuntime.InvokeVoidAsync(
                     "compareScroll.enable",
                     isSyncEnabled);
@@ -238,21 +179,16 @@
         {
             if (dotNetRef != null)
             {
-                //await JSRuntime.InvokeVoidAsync("resizeHandler.cleanup", elementRef);
                 dotNetRef.Dispose();
             }
         }
         catch (JSDisconnectedException e)
         {
-            // Соединение уже разорвано – клиентская очистка невозможна, игнорируем.
-            // dotNetRef всё равно нужно освободить, если он управляемый.
             dotNetRef?.Dispose();
             Console.WriteLine(e.Message);
         }
         catch (Exception e)
         {
-            // Логируем другие ошибки, но не бросаем исключение
-            // (можно залогировать, если есть логгер)
             Console.WriteLine(e.Message);
         }
     }
@@ -268,187 +204,12 @@
         int counterpartOrder = compareStart + (msg.Order - currentStart);
         return ChatService.CompareWithChat.Messages.FirstOrDefault(m => m.Order == counterpartOrder);
     }
-    private double? GetAverageSimilarity()
+    private double GetAverageSimilarity()
     {
-        if (ChatService.CurrentChatDb == null || ChatService.CompareWithChat == null) return null;
-
-        var similarities = new List<double>();
-        foreach (var msg in ChatService.CurrentChatDb.Messages)
+        if (ChatService.messagesDiffs.Count > 0)
         {
-            var counterpart = GetCounterpartMessage(msg);
-            if (counterpart == null) continue;
-            var diff = TextDiffService.Compare(msg.GetCurrentVersion().Content, counterpart.GetCurrentVersion().Content);
-            similarities.Add(diff.Similarity);
+            return ChatService.messagesDiffs.Average();
         }
-        return similarities.Count == 0 ? null : similarities.Average();
+        return 0;
     }
 }
-
-
-@* <div class="container mt-4 col">
-    <div class="card mb-3" style="height: 400px; overflow-y: auto;">
-        <div class="card-body">
-            @foreach (var msg in ChatService.GetMessages())
-            {
-                <div class="mb-2 border rounded p-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <strong>@(msg.Role == "user" ? "Вы" : "Бот"): </strong>
-                        <small class="text-muted">
-                            v@(msg.CurrentVersionIndex + 1) из @msg.Versions.Count
-                            @if (msg.Versions.Count > 1)
-                            {
-                                <button class="btn btn-sm btn-outline-secondary ms-1"
-                                        @onclick="() => ChatService.SwitchToPreviousVersion(msg.Id)"
-                                        disabled="@(msg.CurrentVersionIndex == 0)">
-                                    ◀
-                                </button>
-                                <button class="btn btn-sm btn-outline-secondary"
-                                        @onclick="() => ChatService.SwitchToNextVersion(msg.Id)"
-                                        disabled="@(msg.CurrentVersionIndex == msg.Versions.Count - 1)">
-                                    ▶
-                                </button>
-                            }
-                        </small>
-                    </div>
-
-                    @if (editingMessageId == msg.Id)
-                    {
-                        <div>
-                            <textarea class="form-control" @bind="editContent" rows="3"></textarea>
-                            <button class="btn btn-sm btn-success mt-1" @onclick="() => SaveEdit(msg.Id)">Сохранить как новую версию</button>
-                            <button class="btn btn-sm btn-secondary mt-1" @onclick="() => editingMessageId = null">Отмена</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <span style="white-space: pre-wrap;">@msg.Content</span>
-                        <button class="btn btn-sm btn-outline-secondary ms-2"
-                                @onclick="() => StartEdit(msg)">
-                            ✎
-                        </button>
-                    }
-                </div>
-            }
-        </div>
-    </div>
-
-    
-    <div class="input-group">
-        <textarea id="chatInput"
-                    class="form-control" rows="2"
-                    @bind="userPrompt"
-                    @bind:event="oninput"
-                    @onkeydown="HandleKeyDown"
-                    placeholder="Введите сообщение..."></textarea>
-        <button class="btn btn-primary" id="sendButton" @onclick="AskAI" disabled="@isLoading">
-            @(isLoading ? "Думаю..." : "Отправить")
-        </button>
-    </div>
-
-    <input type="text" @bind="selectedModel" @bind:event="oninput" />
-
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
-</div> *@
-
-@*////////////////////////////////////////////////////////////////////////////////////////////////////////*@
-
-            @* <div class="container column-gap-1 bg-dark">
-                <button class="btn btn-sm btn-outline-secondary" @onclick="AddChat">Создать новый чат</button>
-                @foreach (var chat in ChatService.GetAllChats())
-                {
-                    <button class="btn btn-link" @onclick="() => ChangeChat(chat.Id)">
-                        @chat.Name
-                    </button>
-                }
-            </div> *@
-            
-@*////////////////////////////////////////////////////////////////////////////////////////////////////////*@
-
-@* @code {
-    private string userPrompt = "";
-    private string aiResponse = "";
-    private string errorMessage = "";
-    private string selectedModel = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free";
-    private bool isLoading = false;
-
-    private string? editingMessageId;
-    private string editContent = "";
-
-    private async Task AskAI()
-    {
-        Console.WriteLine("AskAI вызван");
-        if (string.IsNullOrWhiteSpace(userPrompt)) return;
-
-        ChatService.AddMessage(Message.FromUser(userPrompt.Trim()));
-
-        isLoading = true;
-        errorMessage = "";
-        aiResponse = "";
-        userPrompt = "";
-
-        try
-        {
-            aiResponse = await AiService.AskAsync(selectedModel, ChatService.CurrentChat!.GetApiMessages());
-
-            ChatService.AddMessage(Message.FromAssistant(aiResponse));
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Ошибка при обращении к нейросети: {ex.Message}";
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    // Обработчик нажатия клавиш (Enter – отправка)
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await AskAI();
-        }
-    }
-
-    protected override void OnInitialized()
-    {
-        ChatService.OnChange += StateHasChanged;
-    }
-
-    // Вместо прямого обращения к ChatService.GetAllMessages() используем текущую ветку
-    private List<ChatMessage> CurrentMessages => ChatService.CurrentChat?.Messages ?? new();
-
-    private void StartEdit(ChatMessage msg)
-    {
-        editingMessageId = msg.Id;
-        editContent = msg.Content;
-    }
-
-    private void SaveEdit(string messageId)
-    {
-        if (!string.IsNullOrWhiteSpace(editContent))
-        {
-            ChatService.UpdateMessage(messageId, editContent);
-        }
-        editingMessageId = null;
-    }
-    private void AddChat()
-    {
-        Console.WriteLine("Add Chat");
-        ChatService.CreateChat();
-    }
-
-    private void ChangeChat(string chatId)
-    {
-        ChatService.SwitchChat(chatId);
-    }
-
-    public void Dispose()
-    {
-        ChatService.OnChange -= StateHasChanged;
-    }
-} *@
