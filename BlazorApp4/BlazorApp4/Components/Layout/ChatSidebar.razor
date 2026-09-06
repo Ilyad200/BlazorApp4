@@ -5,54 +5,94 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
-<div @ref="sidebarContainer" class="rail">
-    @* <nav class="bg-light p-3"> *@
+<div class="rail">
     <div class="rail-head">
         <button class="new-chat-btn" @onclick="CreateNewChat"><span class="plus">+</span> Новый чат</button>
     </div>
-        @* <button class="btn btn-primary w-100 mb-3" @onclick="CreateNewChat">+ Новый чат</button> *@
     <ul class="rail-list">
         <div class="rail-section-label">Чаты</div>
 
         @foreach (var chat in ChatService.DbChats)
         {
-            <li class="reel @(IsActive(chat) ? "active" : "")"
-                    @onclick="() => ChatService.SwitchChat(chat.Id)"
-                    @onmouseover="() => hoveredChatId = chat.Id"
-                    @onmouseout="() => hoveredChatId = null"
-                    role="button">
-                <div class="reel-body">
+            @if (chatEditedId == chat.Id)
+            {
+                <div class="reel">
                     <div class="reel-info">
-                        <span class="reel-name" title="@chat.Name">@chat.Name</span>
-                        <div class="reel-meta">@chat.Messages.Count сообщ.</div>
+                        <textarea class="reel-textarea"
+                                  @bind="editName"
+                                  @bind:event="oninput"
+                                  @onkeydown="(e) => HandleKeyDownForUpdateMessage(e, chat.Id)">
+                        </textarea>
+                        <div class="sys-edit-actions">
+                            <button class="mini-btn save" @onclick="() => SaveEdit(chat.Id)">✓</button>
+                            <button class="mini-btn cancel" @onclick="() => CancelEdit()">✕</button>
+                        </div>
+
                     </div>
-                    @if (hoveredChatId == chat.Id && ChatService.CurrentChatDb != null)
-                    {
-                        <button class="reel-compare-btn"
-                                @onclick:stopPropagation="true"
-                                @onclick="() => ToggleCompare(chat.Id)"
-                                title="Добавить к сравнению">
-                            ⇆
-                        </button>
-                    }
-
-                    @if (ChatService.CompareWithChatId == chat.Id)
-                    {
-                        <span class="reel-compare-badge" title="Выбран для сравнения">✓</span>
-                    }
                 </div>
+            }
+            else
+            {
+                <li class="reel @(IsActive(chat) ? "active" : "")"
+                @onclick="() => ChatService.SwitchChat(chat.Id)"
+                @onmouseover="() => hoveredChatId = chat.Id"
+                @onmouseout="() => hoveredChatId = null"
+                role="button">
+                    <div class="reel-body">
+                        <div class="reel-info">
+                            <span class="reel-name" title="@chat.Name">@chat.Name</span>
+                            <div class="reel-meta">@chat.Messages.Count сообщ.</div>
+                        </div>
+                        @if (hoveredChatId == chat.Id)
+                        {
+                            <div style="position: relative; display: inline-block;">
+                                <button class="icon-btn more-actions"
+                                        title="Дополнительные действия"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="(e) => ToggleMenu(chat, e)">
+                                    ⋮
+                                </button>
 
-            </li>
+                            </div>
+                        }
+
+                        @if (ChatService.CompareWithChatId == chat.Id)
+                        {
+                            <span class="reel-compare-badge" title="Выбран для сравнения">✓</span>
+                        }
+                    </div>
+
+                </li>
+            }
         }
-        </ul>
-    @* </nav> *@
+    </ul>
+
+    @if (openMenuChat != null)
+    {
+        <div class="menu-overlay" @onclick="() => openMenuChat = null"></div>
+        <div class="floating-chat-menu" style="top:@(menuTop)px; left:@(menuLeft)px;">
+            <button class="floating-chat-menu-item danger" @onclick="async () => await DeleteChat(openMenuChat.Id)">Удалить</button>
+            @if (ChatService.CurrentChatDb != null)
+            {
+                <button class="floating-chat-menu-item" @onclick:stopPropagation="true"
+                        @onclick="() => ToggleCompare(openMenuChat.Id)">
+                    Добавить к сравнению
+                </button>
+            }
+            <button class="floating-chat-menu-item" @onclick="() => StartEdit(openMenuChat)">Переименовать</button>
+        </div>
+    }
 </div>
 
 @code {
     private int? hoveredChatId;
+    private ChatDb? openMenuChat;
 
-    private ElementReference sidebarContainer;
-    private ElementReference resizer;
+    private double menuTop;
+    private double menuLeft;
+
+    private int? chatEditedId;
+    private string editName = "";
 
     protected override void OnInitialized()
     {
@@ -79,6 +119,7 @@
             await ChatService.SetCompareWith(null);
         else
             await ChatService.SetCompareWith(chatId);
+        openMenuChat = null;
     }
 
     private void OnCompareChanged(bool isCompare)
@@ -90,5 +131,45 @@
     {
         ChatService.OnChange -= StateHasChanged;
         ChatService.OnComparisonChanged -= OnCompareChanged;
+    }
+    private void ToggleMenu(ChatDb chat, MouseEventArgs e)
+    {
+        openMenuChat = openMenuChat?.Id == chat.Id ? null : chat;
+        menuTop = e.ClientY;
+        menuLeft = e.ClientX;
+    }
+    private async Task DeleteChat(int chatId)
+    {
+        await ChatService.DeleteChatAsync(chatId);
+        openMenuChat = null;
+    }
+    private async Task HandleKeyDownForUpdateMessage(KeyboardEventArgs e, int chatId)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SaveEdit(chatId);
+        }
+    }
+
+    private void StartEdit(ChatDb chat)
+    {
+        chatEditedId = chat.Id;
+        editName = chat.Name;
+        openMenuChat = null;
+        StateHasChanged();
+    }
+    private async Task SaveEdit(int chatId)
+    {
+        if (!string.IsNullOrWhiteSpace(editName))
+        {
+            await ChatService.RenameChatAsync(chatEditedId!.Value, editName);
+        }
+        chatEditedId = null;
+        StateHasChanged();
+    }
+    private void CancelEdit()
+    {
+        chatEditedId = null;
+        StateHasChanged();
     }
 }

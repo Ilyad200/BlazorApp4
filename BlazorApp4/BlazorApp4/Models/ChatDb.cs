@@ -10,10 +10,8 @@ namespace BlazorApp4.Models
 
         public List<MessageDb> Messages { get; set; } = new();
 
-        // Конструктор для EF (пустой)
         public ChatDb() { }
 
-        // Конструктор для создания нового чата с системным сообщением
         public ChatDb(string name)
         {
             Name = name;
@@ -34,8 +32,6 @@ namespace BlazorApp4.Models
             }
         }
 
-
-        // Вспомогательный метод для быстрого формирования списка для API (user + assistant, иногда system)
         public List<Message> GetApiMessages()
         {
             List<Message> messages = new List<Message>();

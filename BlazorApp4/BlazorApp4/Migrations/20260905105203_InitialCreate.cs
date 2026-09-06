@@ -4,6 +4,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace BlazorApp4.Migrations
 {
     /// <inheritdoc />
@@ -24,6 +26,19 @@ namespace BlazorApp4.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Chats", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Models",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Models", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -137,6 +152,19 @@ namespace BlazorApp4.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.InsertData(
+                table: "Models",
+                columns: new[] { "Id", "Name" },
+                values: new object[,]
+                {
+                    { 1, "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" },
+                    { 2, "nvidia/nemotron-3-nano-30b-a3b:free" },
+                    { 3, "nvidia/nemotron-3-super-120b-a12b:free" },
+                    { 4, "poolside/laguna-xs-2.1:free" },
+                    { 5, "cohere/north-mini-code:free" },
+                    { 6, "dots-studio/dots-3-note-preview:free" }
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Chats_Name",
                 table: "Chats",
@@ -186,6 +214,9 @@ namespace BlazorApp4.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Models");
+
             migrationBuilder.DropTable(
                 name: "SnapshotEntries");
 

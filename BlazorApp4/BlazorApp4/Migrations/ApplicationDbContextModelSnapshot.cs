@@ -208,16 +208,11 @@ namespace BlazorApp4.Migrations
                     b.Property<int?>("SnapshotId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("VersionDbId")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("MessageId");
 
                     b.HasIndex("SnapshotId");
-
-                    b.HasIndex("VersionDbId");
 
                     b.ToTable("Versions");
                 });
@@ -283,10 +278,6 @@ namespace BlazorApp4.Migrations
                         .WithMany()
                         .HasForeignKey("SnapshotId");
 
-                    b.HasOne("BlazorApp4.Models.VersionDb", null)
-                        .WithMany("PreviousVersions")
-                        .HasForeignKey("VersionDbId");
-
                     b.Navigation("Message");
 
                     b.Navigation("Snapshot");
@@ -305,11 +296,6 @@ namespace BlazorApp4.Migrations
             modelBuilder.Entity("BlazorApp4.Models.MessageDb", b =>
                 {
                     b.Navigation("Versions");
-                });
-
-            modelBuilder.Entity("BlazorApp4.Models.VersionDb", b =>
-                {
-                    b.Navigation("PreviousVersions");
                 });
 #pragma warning restore 612, 618
         }

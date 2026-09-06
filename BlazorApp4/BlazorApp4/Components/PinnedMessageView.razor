@@ -1,13 +1,14 @@
 ﻿@rendermode InteractiveServer
 @using BlazorApp4.Services;
 @using BlazorApp4.Models;
+@using BlazorApp4.Components.Icons;
 @using OpenRouter.NET.Models;
+@using Markdig
 
 @inject ChatService ChatService
 @inject AiService AiService
 @inject PinService PinService
-
-@inject PinService PinService
+@inject IJSRuntime JS
 
 <div class="pinned-panel">
 	@foreach (var mes in PinService.PinnedMessageList.OrderBy(m => m.Order))
@@ -17,19 +18,33 @@
                 <span class="model-name">@(mes.Role == "assistant" ? mes.Model : "User")</span>
             </div>
 			<div class="bubble">
-                @mes.Version.Content
+				@RenderMarkdown(mes.Version.Content)
             </div>
 			<div class="msg-foot">
 				<div>
 					<button class="ms-auto btn btn-outline-info"
-							@onclick="async () => await ChatService.SwitchChat(mes.MessageDb.ChatId)">
+							@onclick="async () => await GoToMessage(mes, false)">
 						└
 					</button>
 					<button class="ms-auto btn btn-outline-info"
-							@onclick="async () => await ChatService.SetCompareWith(mes.MessageDb.ChatId)">
+							@onclick="async () => await GoToMessage(mes, true)">
 						┘
 					</button>
 				</div>
+				@if (copiedMessageId == mes.Id)
+				{
+					<div class="icon-btn">
+						✓
+					</div>
+				}
+				else
+				{
+					<button class="icon-btn copy-content"
+							title="Копировать содержимое"
+							@onclick="() => CopyToClipboard(mes.Version.Content, mes.Id)">
+						<CopyIcon />
+					</button>
+				}
                 <button class="ms-auto btn btn-outline-danger"
                         @onclick="() => PinService.RemoveMessage(mes.Id)">🚫
                 </button>
@@ -38,6 +53,11 @@
 	}
 </div>
 @code {
+	private int? copiedMessageId = null;
+	private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+				.UseAdvancedExtensions()
+					.DisableHtml()
+			.Build();
 
 	protected override void OnInitialized()
 	{
@@ -48,5 +68,44 @@
 	{
 		ChatService.OnChange -= StateHasChanged;
 		PinService.OnChange -= StateHasChanged;
+	}
+
+	private async Task GoToMessage(PinnedMessage mes, bool isCompare)
+	{
+		if (isCompare)
+		{
+			await ChatService.SetCompareWith(mes.MessageDb.ChatId);
+		}
+		else
+		{
+			await ChatService.SwitchChat(mes.MessageDb.ChatId);
+		}
+		await ChatService.SwitchToVersionAsync(mes.MessageDb.ChatId, mes.MessageDb.Id, mes.Version.Id, isCompare);
+
+		await Task.Delay(250);
+
+		await JS.InvokeVoidAsync("compareScroll.scrollToMessage", mes.MessageDb.Order, isCompare);
+	}
+	private async Task CopyToClipboard(string content, int messageId)
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("navigator.clipboard.writeText", content);
+			copiedMessageId = messageId;
+			StateHasChanged();
+
+			await Task.Delay(2000);
+			copiedMessageId = null;
+			StateHasChanged();
+		}
+		catch (Exception ex)
+		{
+			StateHasChanged();
+		}
+	}
+	private MarkupString RenderMarkdown(string content)
+	{
+		var html = Markdown.ToHtml(content ?? "", MarkdownPipeline);
+		return new MarkupString(html);
 	}
 }

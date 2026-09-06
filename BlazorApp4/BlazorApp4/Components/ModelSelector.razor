@@ -13,12 +13,17 @@
     {
         <div class="model-selector-backdrop" @onclick="CloseDropdown"></div>
         <div class="model-selector-dropdown">
-            @foreach (var model in ModelListService.Models)
+            @foreach (var model in listModels)
             {
                 <div class="model-selector-item @(model == Value ? "active" : "")"
                      title="@model"
                      @onclick="() => SelectModel(model)">
                     @model
+                    <div class="delete-btn"
+                         @onclick:stopPropagation="true"
+                         @onclick="async () => await DeleteModel(model)">
+                        ✕
+                    </div>
                 </div>
             }
             <div class="model-selector-item model-selector-add" @onclick="OpenAddModal">
@@ -78,15 +83,22 @@
     private string newModelUrl = "";
     private string addError = "";
 
+    private List<string> listModels = new List<string>();
+
     protected override void OnInitialized()
     {
-        // Если кто-то добавил модель через компонент в другой панели (например,
-        // сравнение), этот компонент тоже должен увидеть новую модель в списке.
         ModelListService.OnChange += StateHasChanged;
+
+        GetModels();
     }
 
     private void ToggleDropdown() => isOpen = !isOpen;
     private void CloseDropdown() => isOpen = false;
+
+    private void GetModels()
+    {
+        listModels = ModelListService.GetModels();
+    }
 
     private async Task SelectModel(string model)
     {
@@ -115,14 +127,20 @@
         var url = newModelUrl.Trim();
         if (string.IsNullOrWhiteSpace(url))
         {
-            addError = "Введите ссылку или идентификатор модели.";
+            addError = "Введите ссылку модели.";
             return;
         }
 
-        ModelListService.AddModel(url);
+        await ModelListService.AddModel(url);
         showAddModal = false;
-        // Сразу выбираем только что добавленную модель.
         await ValueChanged.InvokeAsync(url);
+
+        GetModels();
+    }
+    private async Task DeleteModel(string model)
+    {
+        await ModelListService.RemoveModel(model);
+        GetModels();
     }
 
     private async Task HandleModalKeyDown(KeyboardEventArgs e)

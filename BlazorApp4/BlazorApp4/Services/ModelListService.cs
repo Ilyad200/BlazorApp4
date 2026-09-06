@@ -4,12 +4,6 @@ using Microsoft.EntityFrameworkCore.Internal;
 
 namespace BlazorApp4.Services
 {
-    // Общий список "доступных моделей" для выпадающего списка в ModelSelector.
-    // Пока хранится только в памяти (как PinService) — при перезапуске сервера
-    // сбрасывается к дефолтному набору. Если нужно, чтобы список моделей
-    // переживал перезапуск, его несложно перенести в БД по тому же принципу,
-    // что и остальные сущности (отдельная таблица ModelDb + DbSet в
-    // ApplicationDbContext).
     public class ModelListService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
@@ -19,15 +13,6 @@ namespace BlazorApp4.Services
             _contextFactory = contextFactory;
             using var context = _contextFactory.CreateDbContext();
         }
-        public List<string> Models { get; } = new()
-        {
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-            "nvidia/nemotron-3-nano-30b-a3b:free",
-            "nvidia/nemotron-3-super-120b-a12b:free",
-            "poolside/laguna-xs-2.1:free",
-            "cohere/north-mini-code:free",
-            "dots-studio/dots-3-note-preview:free"
-        };
 
         public event Action? OnChange;
 
@@ -44,6 +29,30 @@ namespace BlazorApp4.Services
             await context.Models.AddAsync(newModel);
             await context.SaveChangesAsync();
             OnChange?.Invoke();
+        }
+        public async Task RemoveModel(string modelUrl)
+        {
+            modelUrl = modelUrl.Trim();
+            if (string.IsNullOrWhiteSpace(modelUrl)) return;
+
+            using var context = _contextFactory.CreateDbContext();
+
+            var model = context.Models.FirstOrDefault(m => m.Name == modelUrl);
+            if (model == null) return;
+
+            context.Models.Remove(model);
+            await context.SaveChangesAsync();
+            OnChange?.Invoke();
+        }
+        public List<string> GetModels()
+        {
+            using var context = _contextFactory.CreateDbContext();
+
+            var listModels = context.Models.Select(m => m.Name).ToList();
+
+            if (listModels == null || listModels.Count() <= 0) return [];
+
+            return listModels;
         }
     }
 }

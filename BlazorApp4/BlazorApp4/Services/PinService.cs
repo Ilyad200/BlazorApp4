@@ -6,21 +6,15 @@ namespace BlazorApp4.Services
     {
         public List<PinnedMessage> PinnedMessageList { get; private set; } = new List<PinnedMessage>();
 
-        // Событие, на которое подпишется страница, чтобы знать, когда перерисоваться
         public event Action? OnChange;
 
-        // Метод для добавления нового класса из компонента
         public void AddMessage(int chatId, MessageDb messageDb, VersionDb version, string role, string? model)
         {
             var message = new PinnedMessage(chatId, messageDb, version, role, model, PinnedMessageList.Count);
             PinnedMessageList.Add(message);
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("PinService AddMessage");
-            Console.ResetColor();
-            NotifyStateChanged(); // Уведомляем всех об изменении
+            NotifyStateChanged();
         }
 
-        // Метод для удаления (если понадобится)
         public void RemoveMessage(int id)
         {
             var target = PinnedMessageList.FirstOrDefault(m => m.Id == id);
@@ -29,7 +23,6 @@ namespace BlazorApp4.Services
             NotifyStateChanged();
         }
 
-        // Вспомогательный метод для вызова события
         private void NotifyStateChanged() => OnChange?.Invoke();
     }
 }

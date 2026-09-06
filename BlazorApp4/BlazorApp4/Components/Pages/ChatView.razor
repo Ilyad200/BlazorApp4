@@ -1,6 +1,8 @@
 ﻿@using BlazorApp4.Services;
 @using BlazorApp4.Models;
+@using BlazorApp4.Components.Icons;
 @using OpenRouter.NET.Models;
+@using Markdig
 
 @inject ChatService ChatService
 @inject AiService AiService
@@ -49,8 +51,6 @@
                                           disabled="@(SystemMes.CurrentVersionOrder == 0)">
                                         ◀
                                     </span>
-                                    @* <span class="notch"></span>
-                            <span class="notch current"></span> *@
                                     <span class="arrow" @onclick="() => SwitchVersion(SystemMes.Id, true)"
                                           disabled="@(SystemMes.CurrentVersionOrder >= SystemMes.Versions.Count - 1)">
                                         ▶
@@ -79,7 +79,8 @@
                     <div class="msg @msg.Role 
                             @((IsSelectedToCompare(msg.Order)
                                 || (!ChatService.IsCompareAligned && ChatService.IsSelectingCompareStart && hoveredMessageId == msg.Id))
-                                ? "compare-marked" : "")"
+                                ? "compare-marked" : "")
+                        @(editingMessageDbId == msg.Id ? "editing" : "")"
                          data-order="@msg.Order"
                         @onmouseover="() => hoveredMessageId = msg.Id"
                         @onmouseout="() => hoveredMessageId = null"
@@ -97,12 +98,12 @@
                         </div>
                         @if (editingMessageDbId == msg.Id)
                         {
-                            <div class="sys-edit">
-                                <textarea class="sys-textarea"
-                                @bind="editContent"
-                                @bind:event="oninput"
-                                @onkeydown="(e) => HandleKeyDownForUpdateMessage(e, msg.Id)"></textarea>
-                                <div class="sys-edit-actions">
+                            <div class="msg-edit">
+                                <textarea class="msg-textarea"
+                                          @bind="editContent"
+                                          @bind:event="oninput"
+                                          @onkeydown="(e) => HandleKeyDownForUpdateMessage(e, msg.Id)"></textarea>
+                                <div class="msg-edit-actions">
                                     <button class="mini-btn save" @onclick="() => SaveEdit(msg.Id)">Сохранить</button>
                                     <button class="mini-btn cancel" @onclick="() => CancelEdit()">Отмена</button>
                                 </div>
@@ -120,7 +121,7 @@
                                     <span class="compare-start-marker">📍 Начало сравнения</span>
                                 }
                                 <div class="bubble">
-                                    @msg.GetCurrentVersion().Content
+                                    @RenderMarkdown(msg.GetCurrentVersion().Content)
                                 </div>
                             </div>
                             <div class="msg-foot">
@@ -167,18 +168,20 @@
                                 @onclick="() => PinMessage(msg)">
                                     📌
                                 </button>
-                                @if (msg.GetCurrentVersion().IsOriginal)
+                                @if (copiedMessageId == msg.Id)
                                 {
-                                    <button class="icon-btn"
-                                    @onclick="async () => await SetPreviousVersions(msg.ChatId, msg.GetCurrentVersion())">
-                                        0
+                                    <div class="icon-btn">
+                                        ✓
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button class="icon-btn copy-content"
+                                            title="Копировать содержимое"
+                                            @onclick="() => CopyToClipboard(msg.GetCurrentVersion().Content, msg.Id)">
+                                        <CopyIcon />
                                     </button>
                                 }
-                                <button class="icon-btn copy-content"
-                                        title="Копировать содержимое"
-                                        @onclick="() => CopyToClipboard(msg.GetCurrentVersion().Content, msg.Id)">
-                                    @(copiedMessageId == msg.Id ? "✅" : "📋")
-                                </button>
                                 <div style="position: relative; display: inline-block;">
                                     <button class="icon-btn more-actions" title="Дополнительные действия" @onclick="() => ToggleMenu(msg.Id)">
                                         ⋮
@@ -188,8 +191,14 @@
                                     {
                                         <div class="menu-overlay" @onclick="() => openMenuMessageId = null"></div>
                                         <div class="popup-menu">
-                                            <button class="popup-menu-item danger" @onclick="() => DeleteVersion(msg)">Удалить версию</button>
                                             <button class="popup-menu-item" @onclick="() => CreateBranch(msg)">Создать ветку</button>
+                                            @if (msg.GetCurrentVersion().IsOriginal)
+                                            {
+                                                <button class="popup-menu-item"
+                                                        @onclick="async () => await SetPreviousVersions(msg.ChatId, msg.GetCurrentVersion())">
+                                                    Восстановить контекст
+                                                </button>
+                                            }
                                         </div>
                                     }
                                 </div>
@@ -221,11 +230,6 @@
         </div>
     </div>
 </div>
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger mt-2">@errorMessage</div>
-}
 
 @code {
     // 0 расхождений — зелёный (контекст полностью актуален)
@@ -298,47 +302,12 @@
         int targetIndex = mes.Order - 
                     (IsCompare ? (int)ChatService.CompareStartOrderCompare : (int)ChatService.CompareStartOrderMain);
 
-        Console.WriteLine("GetDiffForMessage");
         if (targetIndex >= ChatService.messagesDiffs.Count || targetIndex < 0) return "";
         return (Math.Round(ChatService.messagesDiffs[targetIndex] * 100, 1)).ToString() + "%";
     }
-    private MarkupString RenderMessageContent(MessageDb msg, TextDiffService.DiffResult? diff)
-    {
-        if (diff != null)
-        {
-            return new MarkupString(TextDiffService.RenderOwnSideHtml(diff));
-        }
-        var content = msg.GetCurrentVersion().Content ?? "";
-        var lines = content.Split('\n');
-        var sb = "";
-        foreach (var line in lines)
-        {
-            sb += line + "<br>";
-        }
-        return new MarkupString(sb);
-    }
-
-    private string FormatSimilarity(double similarity) => $"{Math.Round(similarity * 100)}%";
-
-    private double? GetAverageSimilarity()
-    {
-        if (Chat == null || CounterpartChat == null) return null;
-
-        var similarities = new List<double>();
-        foreach (var msg in Chat.Messages)
-        {
-            var counterpart = GetCounterpartMessage(msg);
-            if (counterpart == null) continue;
-            var diff = TextDiffService.Compare(msg.GetCurrentVersion().Content, counterpart.GetCurrentVersion().Content);
-            similarities.Add(diff.Similarity);
-        }
-        return similarities.Count == 0 ? null : similarities.Average();
-    }
 
     private string userPrompt = "";
-    private string errorMessage = "";
     private bool isLoading = false;
-    private string? editingMessageId;
     private int? editingMessageDbId;
     private string editContent = "";
 
@@ -347,6 +316,11 @@
     private ElementReference scrollElement;
 
     private bool lastEnabled;
+    
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()
+          .DisableHtml()
+        .Build();
 
     protected override void OnInitialized()
     {
@@ -373,9 +347,21 @@
     }
     public async ValueTask DisposeAsync()
     {
-        await JS.InvokeVoidAsync(
-                "compareScroll.unregister",
-                IsCompare);
+        try
+        {
+            await JS.InvokeVoidAsync("compareScroll.unregister", IsCompare);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Соединение с клиентом уже разорвано (например, пользователь закрыл вкладку).
+            // Мы не можем вызвать JS, поэтому просто игнорируем это исключение.
+            // Логировать здесь не нужно, это нормальное поведение.
+        }
+        catch (OperationCanceledException)
+        {
+            // Иногда при разрыве соединения может вылетать и это исключение.
+            // Тоже игнорируем.
+        }
     }
 
     private void OnCompareChanged(bool isCompare)
@@ -443,8 +429,6 @@
         var lastMessage = Chat!.Messages.FirstOrDefault(m => m.Order == lastMessageOrder);
         if (string.IsNullOrWhiteSpace(lastMessage.GetCurrentVersion().Content)) return;
 
-        errorMessage = "";
-
         isLoading = true;
         StateHasChanged();
 
@@ -468,7 +452,6 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при обращении к нейросети: {ex.Message}";
         }
         finally
         {
@@ -480,8 +463,6 @@
     {
         if (string.IsNullOrWhiteSpace(userPrompt)) return;
 
-        errorMessage = "";
-
         if (Chat == null)
         {
             await ChatService.AddChatAsync();
@@ -489,7 +470,6 @@
         var previousVersions = await ChatService.GetPreviousVersions(Chat!.Id);
         await ChatService.AddMessageAsync(Chat!.Id, "user", userPrompt.Trim(), selectedModel, isOriginal: true);
         isLoading = true;
-        errorMessage = "";
         userPrompt = "";
         StateHasChanged();
 
@@ -501,7 +481,6 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при обращении к нейросети: {ex.Message}";
         }
         finally
         {
@@ -527,17 +506,6 @@
         await ChatService.PreviousVersions(chatId, version, IsCompare);
         StateHasChanged();
     }
-    private void SelectComparePoint(MessageDb msg)
-    {
-        if (!IsCompare)
-        {
-            ChatService.SetLeftMessageToCompare(msg);
-        }
-        else
-        {
-            ChatService.SetRightMessageToCompare(msg);
-        }
-    }
 
     private async Task HandleKeyDownForAskAI(KeyboardEventArgs e)
     {
@@ -562,12 +530,6 @@
         openMenuMessageId = openMenuMessageId == messageId ? null : messageId;
     }
 
-    private async Task DeleteVersion(MessageDb msg)
-    {
-        Console.WriteLine($"[Заглушка] Удаление версии {msg.GetCurrentVersion().Id} сообщения {msg.Id}");
-        openMenuMessageId = null;
-    }
-
     private async Task CreateBranch(MessageDb msg)
     {
         await ChatService.CreateBranchAsync(Chat.Id, msg.Id);
@@ -590,8 +552,13 @@
         }
         catch (Exception ex)
         {
-            errorMessage = "Не удалось скопировать содержимое";
             StateHasChanged();
         }
+    }
+
+    private MarkupString RenderMarkdown(string content)
+    {
+        var html = Markdown.ToHtml(content ?? "", MarkdownPipeline);
+        return new MarkupString(html);
     }
 }

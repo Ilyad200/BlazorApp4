@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorApp4.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260819122736_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260905121217_Updetaersions")]
+    partial class Updetaersions
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -100,6 +100,55 @@ namespace BlazorApp4.Migrations
                     b.ToTable("Messages");
                 });
 
+            modelBuilder.Entity("BlazorApp4.Models.Model", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Models");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "nvidia/nemotron-3-nano-30b-a3b:free"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "nvidia/nemotron-3-super-120b-a12b:free"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "poolside/laguna-xs-2.1:free"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "cohere/north-mini-code:free"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "dots-studio/dots-3-note-preview:free"
+                        });
+                });
+
             modelBuilder.Entity("BlazorApp4.Models.SnapshotEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -162,16 +211,11 @@ namespace BlazorApp4.Migrations
                     b.Property<int?>("SnapshotId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("VersionDbId")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("MessageId");
 
                     b.HasIndex("SnapshotId");
-
-                    b.HasIndex("VersionDbId");
 
                     b.ToTable("Versions");
                 });
@@ -237,10 +281,6 @@ namespace BlazorApp4.Migrations
                         .WithMany()
                         .HasForeignKey("SnapshotId");
 
-                    b.HasOne("BlazorApp4.Models.VersionDb", null)
-                        .WithMany("PreviousVersions")
-                        .HasForeignKey("VersionDbId");
-
                     b.Navigation("Message");
 
                     b.Navigation("Snapshot");
@@ -259,11 +299,6 @@ namespace BlazorApp4.Migrations
             modelBuilder.Entity("BlazorApp4.Models.MessageDb", b =>
                 {
                     b.Navigation("Versions");
-                });
-
-            modelBuilder.Entity("BlazorApp4.Models.VersionDb", b =>
-                {
-                    b.Navigation("PreviousVersions");
                 });
 #pragma warning restore 612, 618
         }

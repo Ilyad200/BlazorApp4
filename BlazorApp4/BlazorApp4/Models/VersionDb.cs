@@ -9,7 +9,6 @@
         public bool IsOriginal { get; set; } = false;
         public DateTimeOffset CreatedAt { get; set; }
 
-        public List<VersionDb>? PreviousVersions { get; set; } = new();
         public int MessageId { get; set; }
         public MessageDb Message { get; set; }
 
@@ -27,15 +26,6 @@
             CreatedAt = other.CreatedAt;
             MessageId = other.MessageId;
             Message = other.Message;
-            if (other.PreviousVersions != null)
-            {
-                PreviousVersions = new List<VersionDb>(other.PreviousVersions.Count);
-                foreach (var v in other.PreviousVersions)
-                {
-                    PreviousVersions.Add(new(v));
-                }
-            }
-            else PreviousVersions = null;
             if (other.SnapshotId != null) SnapshotId = other.SnapshotId;
             else SnapshotId = null;
             if (other.Snapshot != null) Snapshot = other.Snapshot;
@@ -51,14 +41,6 @@
                 IsOriginal = other.IsOriginal,
                 CreatedAt = other.CreatedAt
             };
-            if (other.PreviousVersions != null)
-            {
-                newVers.PreviousVersions = new List<VersionDb>(other.PreviousVersions.Count);
-                foreach (var v in other.PreviousVersions)
-                {
-                    newVers.PreviousVersions.Add(CreateCleanVersion(v));
-                }
-            }
             return newVers;
         }
     }

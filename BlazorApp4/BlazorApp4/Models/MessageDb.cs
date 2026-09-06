@@ -29,9 +29,6 @@ namespace BlazorApp4.Models
         }
         public VersionDb AddVersion(string content, string? model, bool isOriginal = false)
         {
-            Console.WriteLine("/////////////////////////////////////");
-            Console.WriteLine($"Message {Id}: Versions count {Versions.Count}");
-
             if (model == null) model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free";
             var version = new VersionDb
             {
@@ -48,7 +45,6 @@ namespace BlazorApp4.Models
             return version;
         }
 
-        // Получить текущую версию (обёртка)
         public VersionDb GetCurrentVersion()
         {
             return Versions.FirstOrDefault(v => v.Order == CurrentVersionOrder)!;

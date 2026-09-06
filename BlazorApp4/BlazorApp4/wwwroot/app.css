@@ -182,6 +182,18 @@ article {
     color: var(--text-faint);
     margin-top: 2px;
 }
+.reel-textarea {
+    font-size: 13.5px;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--trace-a);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    color: var(--text);
+    line-height: 1.3;
+    resize: vertical;
+    outline: none;
+}
 .reel-compare-btn {
     width: 22px;
     height: 22px;
@@ -478,6 +490,7 @@ input.input-message::placeholder {
 }
 
 .model-selector-item {
+    display: flex;
     padding: 8px 10px;
     border-radius: var(--radius-sm);
     font-family: 'JetBrains Mono', monospace;
@@ -498,6 +511,12 @@ input.input-message::placeholder {
     .model-selector-item.active {
         color: var(--trace-a);
     }
+.delete-btn {
+    border-radius: 50%;
+    border-color: var(--led-bad);
+    color: var(--led-bad);
+    margin-left: auto;
+}
 
 .model-selector-add {
     font-weight: 600;
@@ -1159,7 +1178,7 @@ mark.diff-unique {
     background: var(--surface-2);
     border: 1px solid var(--trace-a);
     border-radius: var(--radius);
-    padding: 7px 9px;
+    padding: 7px 10px;
     color: var(--text);
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -1222,6 +1241,7 @@ mark.diff-unique {
 /* message card */
 .msg {
     max-width: 78%;
+    min-width: 20%;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1235,6 +1255,10 @@ mark.diff-unique {
     .msg.assistant {
         align-self: flex-start;
         align-items: flex-start;
+    }
+    .msg.editing {
+        width: 100%;
+        flex: none;
     }
 
 .msg-tag {
@@ -1405,14 +1429,16 @@ mark.diff-unique {
     background: var(--surface-2);
     border: 1px solid var(--hair);
     border-radius: var(--radius);
-    padding: 10px 12px;
+    padding: 7px 10px;
     color: var(--text);
     font-family: 'Inter', sans-serif;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.3;
     resize: vertical;
     outline: none;
-    min-height: 56px;
+    line-height: 1.3;
+    position: relative;
+    min-width: 250px;
 }
 
 .stream.a .msg-textarea {
@@ -1478,10 +1504,11 @@ mark.diff-unique {
 .popup-menu {
     position: absolute;
     bottom: 120%;
-    right: 0;
+    left: 0;
     background: var(--surface);
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
+    /*border: 1px solid #dee2e6;*/
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-sm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 1050;
     display: flex;
@@ -1513,6 +1540,42 @@ mark.diff-unique {
     }
 
         .popup-menu-item.danger:hover {
+            background-color: var(--surface-2);
+            color: #dc3545;
+        }
+
+.floating-chat-menu {
+    position: fixed; /* Ключевое свойство: игнорирует overflow родителя */
+    z-index: 1050;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 130px;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(-100%);
+    animation: fadeIn 0.15s ease-out;
+}
+
+    .floating-chat-menu-item {
+        background: transparent;
+        border: none;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 10px;
+    }
+
+        .floating-chat-menu-item:hover {
+            background: var(--surface);
+        }
+    .floating-chat-menu-item.danger {
+        color: #df5555;
+    }
+        .floating-chat-menu-item.danger:hover {
             background-color: var(--surface-2);
             color: #dc3545;
         }

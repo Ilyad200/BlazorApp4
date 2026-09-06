@@ -19,8 +19,6 @@ builder.Services.AddScoped<PinService>();
 builder.Services.AddScoped<ModelListService>();
 builder.Services.AddScoped<CompareScrollService>();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-//builder.Services.AddDbContext<ApplicationDbContext>(options =>
-//    options.UseNpgsql(connectionString));
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
     options.UseNpgsql(connectionString);
@@ -28,7 +26,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.EnableDetailedErrors();
 });
 
-builder.Services.AddHttpClient(); // регистрируем фабрику
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SemanticComparisonService>();
 
 var app = builder.Build();

@@ -9,7 +9,7 @@
         public int MessageId { get; set; }
         public MessageDb Message { get; set; } = null!;
 
-        public int VersionId { get; set; } // Какая версия этого сообщения была активна
+        public int VersionId { get; set; }
         public VersionDb Version { get; set; } = null!;
     }
 }

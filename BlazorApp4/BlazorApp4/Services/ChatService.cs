@@ -53,10 +53,6 @@ namespace BlazorApp4.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.BackgroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Handler: {handler.Method.DeclaringType}.{handler.Method.Name}");
-                    Console.WriteLine(ex);
-                    Console.ResetColor();
                     throw;
                 }
             }
@@ -159,6 +155,19 @@ namespace BlazorApp4.Services
                 CompareWithChatId = null;
             }
 
+            NotifyStateChanged();
+        }
+
+        public async Task RenameChatAsync(int chatId, string newName)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            var chat = await context.Chats.FindAsync(chatId);
+            if (chat == null) return;
+
+            chat.Name = newName;
+            await context.SaveChangesAsync();
+            await RefreshDbChatsAsync();
             NotifyStateChanged();
         }
 
@@ -295,7 +304,6 @@ namespace BlazorApp4.Services
             ChatDb? chat = await context.Chats.Include(c => c.Messages).ThenInclude(m => m.Versions).FirstOrDefaultAsync(c => c.Id == chatId);
             if (chat == null)
             {
-                Console.WriteLine($"[ChatService GetPreviousVersions]: chat is null; id: {chatId}");
                 return new();
             }
             if (messageOrder == null)
@@ -306,8 +314,6 @@ namespace BlazorApp4.Services
             for (int i = 0; i < messageOrder; i++)
             {
                 var vers = chat.Messages[i].GetCurrentVersion();
-                Console.WriteLine($"[ChatService GetPreviousVersions]: {i}");
-                Console.WriteLine($"[ChatService GetPreviousVersions]: {vers.Content}");
                 previousVersions.Add(vers);
             }
             return previousVersions;
@@ -424,10 +430,10 @@ namespace BlazorApp4.Services
 
                 msg.CurrentVersionOrder = vers.Order;
                 await context.SaveChangesAsync();
-                await UpdateMessageDiffForMessage(msg, isCompare);
                 await RefreshChatSlot(chatId);
                 await UpdateContextShiftAfterEditAsync(chatId, msg.Order, isCompare);
                 await RefreshDbChatsAsync();
+                await UpdateMessageDiffForMessage(msg, isCompare);
             }
             NotifyStateChanged();
         }
@@ -675,8 +681,6 @@ namespace BlazorApp4.Services
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            // Словарь для быстрого поиска НОВЫХ версий по их Order (и Order родительского сообщения)
-            // Ключ: (Order сообщения, Order версии) -> Значение: Новая версия
             var newVersionsLookup = new Dictionary<(int msgOrder, int verOrder), VersionDb>();
 
             foreach (var mes in chat.Messages.OrderBy(m => m.Order))

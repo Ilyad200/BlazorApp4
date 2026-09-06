@@ -154,6 +154,18 @@
             enabled = value;
             // Если отключаем – сбрасываем флаг синхронизации
             if (!value) syncing = false;
+        },
+        scrollToMessage(order, isCompare) {
+            // Ищем элемент сообщения по атрибуту data-order, который задается в ChatView.razor
+            let msg = null;
+            if (isCompare)
+                msg = right.querySelector(`.msg[data-order="${order}"]`);
+            else 
+                msg = left.querySelector(`.msg[data-order="${order}"]`);
+            if (msg) {
+                // Плавно прокручиваем так, чтобы сообщение оказалось по центру экрана
+                msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     };
 
